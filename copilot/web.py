@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import os
+import queue
 import secrets
 import threading
 import time
@@ -337,6 +338,34 @@ class DailyBudget:
             self.usd += max(0.0, usd)
 
 
+class Runner:
+    """One long-lived asyncio loop in a background thread with one Copilot (and HTTP client) per config.
+    Avoids per-request client construction, TLS setup and the first-request SDK import; request threads
+    submit work with `run()`. Partial results go through a queue so a slow browser can never block the loop."""
+
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        threading.Thread(target=self.loop.run_forever, name="copilot-loop", daemon=True).start()
+        self.copilots: dict[str, Copilot] = {}
+        self.lock = threading.Lock()
+
+    def copilot(self, cfg: Config) -> Copilot:
+        key = repr(cfg)
+        with self.lock:
+            if key not in self.copilots:
+                # The async client must be created on the loop that will use it.
+                self.copilots[key] = asyncio.run_coroutine_threadsafe(self._make(cfg), self.loop).result()
+            return self.copilots[key]
+
+    @staticmethod
+    async def _make(cfg: Config) -> Copilot:
+        return Copilot(cfg)
+
+    def submit(self, cfg: Config, text: str, on_partial=None):
+        cp = self.copilot(cfg)
+        return asyncio.run_coroutine_threadsafe(cp.process(text, "web", on_partial=on_partial), self.loop)
+
+
 def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> ThreadingHTTPServer:
     import html
 
@@ -351,6 +380,8 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
     budget = DailyBudget(int(os.environ.get("COPILOT_DAILY_LIMIT") or 300),
                          float(os.environ.get("COPILOT_DAILY_USD_LIMIT") or 5.0))
     inflight = threading.BoundedSemaphore(MAX_INFLIGHT)
+    runner = Runner()
+    runner.copilot(default if default.backend != "anthropic" else default.with_(cache_ttl="1h"))  # warm: SDK import + client
 
     def make_token() -> str:
         exp = str(int(time.time()) + SESSION_HOURS * 3600)
@@ -492,7 +523,7 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
                 return
             text, cfg = prep
             try:
-                res = asyncio.run(Copilot(cfg).process_many([{"id": "web", "text": text}]))[0]
+                res = runner.submit(cfg, text).result()
                 budget.spend(res["usage"]["cost_usd"])
             finally:
                 inflight.release()
@@ -519,12 +550,13 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
                     alive = False
 
             last = {"t": 0.0, "view": None}
+            updates: queue.Queue = queue.Queue()
 
-            def on_partial(view: dict) -> None:
+            def on_partial(view: dict) -> None:  # runs on the shared loop: never touch the socket here
                 now = time.monotonic()
                 if view != last["view"] and (now - last["t"] > 0.06 or view.get("draft_complete")):
                     last.update(t=now, view=view)
-                    emit("partial", view)
+                    updates.put(view)
 
             try:
                 self.send_response(200)
@@ -533,14 +565,13 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
                     self.send_header(k, v)
                 self.end_headers()
 
-                async def run():
-                    cp = Copilot(cfg)
+                fut = runner.submit(cfg, text, on_partial)
+                while not fut.done():
                     try:
-                        return await cp.process(text, "web", on_partial=on_partial)
-                    finally:
-                        await cp.aclose()
-
-                res = asyncio.run(run())
+                        emit("partial", updates.get(timeout=0.05))
+                    except queue.Empty:
+                        pass
+                res = fut.result()
                 budget.spend(res["usage"]["cost_usd"])
                 emit("final", res)
             finally:
