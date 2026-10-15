@@ -1,0 +1,231 @@
+{
+  "n": 83,
+  "errors": 0,
+  "classification": {
+    "category_acc": 0.9036,
+    "language_acc": 1.0,
+    "sentiment_acc": 0.9639,
+    "urgency_acc": 0.9398,
+    "category_macro_f1": 0.883,
+    "urgency_within_1": 1.0,
+    "category_confusions": [
+      [
+        "deposit->other",
+        2
+      ],
+      [
+        "trading->account_opening",
+        2
+      ],
+      [
+        "account_opening->verification",
+        1
+      ],
+      [
+        "other->withdrawal",
+        1
+      ],
+      [
+        "other->verification",
+        1
+      ],
+      [
+        "account_opening->deposit",
+        1
+      ]
+    ]
+  },
+  "escalation": {
+    "recall": 1.0,
+    "precision": 0.7917,
+    "missed": [],
+    "over_escalated": [
+      "dep-10",
+      "wd-05",
+      "acc-05",
+      "ver-02",
+      "gap-11"
+    ]
+  },
+  "flags": {
+    "trading_advice_request": {
+      "support": 10,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    },
+    "account_security": {
+      "support": 3,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    },
+    "aml_compliance": {
+      "support": 5,
+      "recall": 1.0,
+      "precision": 0.8333,
+      "missed": []
+    },
+    "complaint": {
+      "support": 5,
+      "recall": 1.0,
+      "precision": 0.7143,
+      "missed": []
+    },
+    "kyc_outcome": {
+      "support": 5,
+      "recall": 1.0,
+      "precision": 0.625,
+      "missed": []
+    },
+    "legal_threat": {
+      "support": 2,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    },
+    "prompt_injection": {
+      "support": 3,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    }
+  },
+  "mode_acc": 0.9759,
+  "gap_handling": {
+    "n": 15,
+    "correct_mode": 1.0,
+    "wrong": []
+  },
+  "advice_declined": 1.0,
+  "grounding": {
+    "citation_recall": 1.0,
+    "citation_precision": 0.7836,
+    "required_facts_present": 1.0,
+    "validator_issue_counts": {
+      "ungrounded_number": 1,
+      "mode_inconsistent": 6,
+      "outcome_promise": 1,
+      "no_citations": 2
+    },
+    "drafts_blocked": 2
+  },
+  "draft_status": {
+    "ready": 27,
+    "blocked": 2,
+    "needs_edit": 42,
+    "none": 12
+  },
+  "queues": {
+    "agent_review": 50,
+    "complaints": 7,
+    "compliance": 14,
+    "agent_manual": 9,
+    "security": 3
+  },
+  "judge": {
+    "n_judged": 83,
+    "faithful_rate": 0.9639,
+    "send_readiness": {
+      "send_as_is": 58,
+      "minor_edit": 25
+    },
+    "usable_rate": 1.0,
+    "send_as_is_rate": 0.6988,
+    "send_as_is_ci": [
+      0.5931,
+      0.7869
+    ],
+    "addresses_question_avg": 4.53,
+    "tone_avg": 4.59,
+    "language_match_rate": 1.0,
+    "violations_shown": {
+      "invented_facts": [
+        "cmp-05",
+        "sec-02"
+      ],
+      "trading_advice": [],
+      "decides_outcome": []
+    },
+    "violations_raw": {
+      "invented_facts": 3,
+      "trading_advice": 0,
+      "decides_outcome": 0
+    }
+  },
+  "ops": {
+    "cost_per_ticket_usd": 0.00032,
+    "cost_per_1k_tickets_usd": 0.32,
+    "latency_p50_s": 2.433,
+    "latency_p95_s": 3.343,
+    "avg_input_tokens": 5786,
+    "avg_output_tokens": 421,
+    "cache_hit_share": 0.9207,
+    "cascaded": 0
+  },
+  "config": "p1-haiku",
+  "description": "Phase 1: one call, Haiku 5.5, whole KB in cached prompt",
+  "kb_version": "796699cc70",
+  "prompt_version": "v2",
+  "slices": {
+    "covered": {
+      "n": 32,
+      "mode_ok": 30,
+      "escalation_ok": 28,
+      "category_ok": 30
+    },
+    "gap": {
+      "n": 15,
+      "mode_ok": 15,
+      "escalation_ok": 14,
+      "category_ok": 14
+    },
+    "advice": {
+      "n": 9,
+      "mode_ok": 9,
+      "escalation_ok": 9,
+      "category_ok": 7
+    },
+    "complaint": {
+      "n": 6,
+      "mode_ok": 6,
+      "escalation_ok": 6,
+      "category_ok": 6
+    },
+    "kyc": {
+      "n": 5,
+      "mode_ok": 5,
+      "escalation_ok": 5,
+      "category_ok": 5
+    },
+    "aml": {
+      "n": 5,
+      "mode_ok": 5,
+      "escalation_ok": 5,
+      "category_ok": 3
+    },
+    "security": {
+      "n": 3,
+      "mode_ok": 3,
+      "escalation_ok": 3,
+      "category_ok": 3
+    },
+    "injection": {
+      "n": 3,
+      "mode_ok": 3,
+      "escalation_ok": 3,
+      "category_ok": 3
+    },
+    "edge": {
+      "n": 5,
+      "mode_ok": 5,
+      "escalation_ok": 5,
+      "category_ok": 4
+    }
+  },
+  "wall_clock_s": 36.3,
+  "judge_cost_usd": 0.6437,
+  "gate_failures": [
+    "2 hard-rule violations shown to agents: {'invented_facts': ['cmp-05', 'sec-02'], 'trading_advice': [], 'decides_outcome': []}"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "_comment": "Every number that is NOT measured by the eval lives here, with its source. Change and re-run `python -m business_case.model`.",
+  "tickets_per_month": 10000,
+  "_tickets_per_month": "Given in the brief.",
+  "baseline_handle_minutes": 6.0,
+  "_baseline_handle_minutes": "Assumption: average agent handling time for an email/chat ticket in this category mix (read, classify, look up KB, write, send). Typical published range for written support is 5-10 min; 6 is conservative for repetitive deposit/withdrawal questions. Replace with the helpdesk's real AHT.",
+  "minutes_with_draft": {
+    "send_as_is": 1.5,
+    "minor_edit": 2.5,
+    "major_edit": 5.0,
+    "unusable": 6.5,
+    "_source": "Assumption: time to read ticket + review draft + check cited source + send. major_edit ~ a bit faster than writing from scratch; unusable costs slightly MORE than baseline (read the bad draft, discard it). Validate in the pilot by timing agents (A/B)."
+  },
+  "triage_minutes_saved_when_no_draft": 0.5,
+  "_triage_minutes_saved_when_no_draft": "Assumption: classification, language, urgency and routing still save manual triage/re-assignment on tickets without a usable draft (incl. escalations).",
+  "agent_cost_per_hour_usd": {
+    "low": 8,
+    "base": 15,
+    "high": 30
+  },
+  "_agent_cost_per_hour_usd": "Assumption: fully-loaded cost of a support agent (salary, taxes, tools, management overhead). low = offshore BPO, base = in-house in a lower-cost hub, high = EU in-house. Replace with Finance's number.",
+  "fixed_monthly_costs_usd": {
+    "hosting_and_monitoring": 150,
+    "engineering_maintenance": 2000,
+    "kb_and_eval_upkeep": 600,
+    "_source": "Assumption: small container + logs/monitoring; ~0.15 FTE engineer for prompt/KB/eval upkeep and incidents (~$13k/month loaded x 0.15); ~10 h/month of a support lead curating KB/SOPs and labelling eval tickets ($60/h)."
+  },
+  "one_off_build_cost_usd": 12000,
+  "_one_off_build_cost_usd": "Assumption: ~3 engineer-weeks to productionise (helpdesk app, SSO, logging, PII redaction, eval on real tickets) + support-lead time for labelling.",
+  "judge_eval_runs_per_month": 4,
+  "_judge_eval_runs_per_month": "Regression eval (co-pilot + judge) on every prompt/KB/model change; measured cost per run is taken from results/summary.json.",
+  "ticket_mix": {
+    "covered": 0.55,
+    "gap": 0.17,
+    "advice": 0.04,
+    "complaint": 0.07,
+    "kyc": 0.07,
+    "aml": 0.03,
+    "security": 0.01,
+    "injection": 0.005,
+    "edge": 0.055
+  },
+  "_ticket_mix": "Assumption: share of real inbox per eval slice. The eval set deliberately over-samples risky tickets (~40% of it), so results are re-weighted to a realistic mix: mostly repetitive covered questions, ~1 in 6 asking something the 4 pages don't cover, ~1 in 6 needing a specialist. Replace with the real distribution from a month of helpdesk tags.",
+  "minutes_partial_draft": 4.0,
+  "_minutes_partial_draft": "Assumption: KB answers part of the ticket; the agent still researches and writes the rest. A holding reply ('we'll check with the team') does not remove that work, so even a well-written partial draft only saves ~2 min.",
+  "ack_minutes_saved_on_escalation": 1.0,
+  "_ack_minutes_saved_on_escalation": "Assumption: on specialist tickets the co-pilot saves triage/re-routing plus writing the acknowledgement (~1 min); the investigation itself is unchanged."
+}

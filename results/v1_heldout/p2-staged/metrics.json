@@ -1,0 +1,224 @@
+{
+  "n": 83,
+  "errors": 0,
+  "classification": {
+    "category_acc": 0.9157,
+    "language_acc": 1.0,
+    "sentiment_acc": 0.9759,
+    "urgency_acc": 0.9277,
+    "category_macro_f1": 0.905,
+    "urgency_within_1": 1.0,
+    "category_confusions": [
+      [
+        "deposit->other",
+        2
+      ],
+      [
+        "account_opening->verification",
+        1
+      ],
+      [
+        "withdrawal->other",
+        1
+      ],
+      [
+        "other->withdrawal",
+        1
+      ],
+      [
+        "other->deposit",
+        1
+      ],
+      [
+        "account_opening->deposit",
+        1
+      ]
+    ]
+  },
+  "escalation": {
+    "recall": 0.9474,
+    "precision": 0.9474,
+    "missed": [
+      "kyc-05"
+    ],
+    "over_escalated": [
+      "wd-05"
+    ]
+  },
+  "flags": {
+    "trading_advice_request": {
+      "support": 10,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    },
+    "account_security": {
+      "support": 3,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    },
+    "aml_compliance": {
+      "support": 5,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    },
+    "complaint": {
+      "support": 5,
+      "recall": 1.0,
+      "precision": 0.8333,
+      "missed": []
+    },
+    "kyc_outcome": {
+      "support": 5,
+      "recall": 0.8,
+      "precision": 0.8,
+      "missed": [
+        "kyc-05"
+      ]
+    },
+    "legal_threat": {
+      "support": 2,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    },
+    "prompt_injection": {
+      "support": 3,
+      "recall": 1.0,
+      "precision": 1.0,
+      "missed": []
+    }
+  },
+  "mode_acc": 0.988,
+  "gap_handling": {
+    "n": 15,
+    "correct_mode": 1.0,
+    "wrong": []
+  },
+  "advice_declined": 1.0,
+  "grounding": {
+    "citation_recall": 0.9786,
+    "citation_precision": 0.808,
+    "required_facts_present": 0.8889,
+    "validator_issue_counts": {
+      "no_citations": 2
+    },
+    "drafts_blocked": 0
+  },
+  "draft_status": {
+    "ready": 39,
+    "needs_edit": 27,
+    "none": 17
+  },
+  "queues": {
+    "agent_review": 52,
+    "compliance": 10,
+    "agent_manual": 12,
+    "complaints": 6,
+    "security": 3
+  },
+  "judge": {
+    "n_judged": 83,
+    "faithful_rate": 1.0,
+    "send_readiness": {
+      "send_as_is": 62,
+      "minor_edit": 19,
+      "major_edit": 2
+    },
+    "usable_rate": 0.9759,
+    "send_as_is_rate": 0.747,
+    "send_as_is_ci": [
+      0.644,
+      0.8281
+    ],
+    "addresses_question_avg": 4.58,
+    "tone_avg": 4.6,
+    "language_match_rate": 1.0,
+    "violations_shown": {
+      "invented_facts": [],
+      "trading_advice": [],
+      "decides_outcome": []
+    },
+    "violations_raw": {
+      "invented_facts": 0,
+      "trading_advice": 0,
+      "decides_outcome": 0
+    }
+  },
+  "ops": {
+    "cost_per_ticket_usd": 0.005674,
+    "cost_per_1k_tickets_usd": 5.674,
+    "latency_p50_s": 4.687,
+    "latency_p95_s": 7.199,
+    "avg_input_tokens": 4688,
+    "avg_output_tokens": 441,
+    "cache_hit_share": 0.773,
+    "cascaded": 0
+  },
+  "config": "p2-staged",
+  "description": "Phase 2: Haiku triage + English query -> BM25 top-k -> Sonnet draft",
+  "kb_version": "796699cc70",
+  "slices": {
+    "covered": {
+      "n": 32,
+      "mode_ok": 31,
+      "escalation_ok": 31,
+      "category_ok": 30
+    },
+    "gap": {
+      "n": 15,
+      "mode_ok": 15,
+      "escalation_ok": 15,
+      "category_ok": 14
+    },
+    "advice": {
+      "n": 9,
+      "mode_ok": 9,
+      "escalation_ok": 9,
+      "category_ok": 9
+    },
+    "complaint": {
+      "n": 6,
+      "mode_ok": 6,
+      "escalation_ok": 6,
+      "category_ok": 5
+    },
+    "kyc": {
+      "n": 5,
+      "mode_ok": 5,
+      "escalation_ok": 4,
+      "category_ok": 5
+    },
+    "aml": {
+      "n": 5,
+      "mode_ok": 5,
+      "escalation_ok": 5,
+      "category_ok": 3
+    },
+    "security": {
+      "n": 3,
+      "mode_ok": 3,
+      "escalation_ok": 3,
+      "category_ok": 3
+    },
+    "injection": {
+      "n": 3,
+      "mode_ok": 3,
+      "escalation_ok": 3,
+      "category_ok": 3
+    },
+    "edge": {
+      "n": 5,
+      "mode_ok": 5,
+      "escalation_ok": 5,
+      "category_ok": 4
+    }
+  },
+  "wall_clock_s": 69.0,
+  "judge_cost_usd": 0.6285,
+  "gate_failures": [
+    "escalation recall 0.9474 (missed ['kyc-05'])"
+  ]
+}

@@ -1,0 +1,171 @@
+{
+  "rows": [
+    {
+      "config": "p1-haiku",
+      "minutes_per_ticket_with_copilot": 3.18,
+      "minutes_saved_per_ticket": 2.82,
+      "hours_saved_per_month": 470,
+      "fte_equivalent": 2.9,
+      "llm_cost_per_month": 3.2,
+      "eval_cost_per_month": 2.68,
+      "fixed_cost_per_month": 2750,
+      "total_cost_per_month": 2756,
+      "value_per_month": 7056,
+      "net_per_month": 4300,
+      "payback_months": 2.8,
+      "break_even_agent_rate": 5.86,
+      "break_even_volume_at_rate": 3899,
+      "gate": "FAIL",
+      "usable_rate": 1.0,
+      "escalation_recall": 1.0
+    },
+    {
+      "config": "p1-sonnet",
+      "minutes_per_ticket_with_copilot": 3.16,
+      "minutes_saved_per_ticket": 2.84,
+      "hours_saved_per_month": 474,
+      "fte_equivalent": 3.0,
+      "llm_cost_per_month": 62.21,
+      "eval_cost_per_month": 4.51,
+      "fixed_cost_per_month": 2750,
+      "total_cost_per_month": 2817,
+      "value_per_month": 7104,
+      "net_per_month": 4288,
+      "payback_months": 2.8,
+      "break_even_agent_rate": 5.95,
+      "break_even_volume_at_rate": 3905,
+      "gate": "PASS",
+      "usable_rate": 1.0,
+      "escalation_recall": 1.0
+    },
+    {
+      "config": "p1-opus",
+      "minutes_per_ticket_with_copilot": 2.97,
+      "minutes_saved_per_ticket": 3.03,
+      "hours_saved_per_month": 505,
+      "fte_equivalent": 3.2,
+      "llm_cost_per_month": 126.24,
+      "eval_cost_per_month": 6.67,
+      "fixed_cost_per_month": 2750,
+      "total_cost_per_month": 2883,
+      "value_per_month": 7576,
+      "net_per_month": 4693,
+      "payback_months": 2.6,
+      "break_even_agent_rate": 5.71,
+      "break_even_volume_at_rate": 3691,
+      "gate": "FAIL",
+      "usable_rate": 1.0,
+      "escalation_recall": 1.0
+    },
+    {
+      "config": "p1-haiku-cascade",
+      "minutes_per_ticket_with_copilot": 3.24,
+      "minutes_saved_per_ticket": 2.76,
+      "hours_saved_per_month": 460,
+      "fte_equivalent": 2.9,
+      "llm_cost_per_month": 3.99,
+      "eval_cost_per_month": 2.84,
+      "fixed_cost_per_month": 2750,
+      "total_cost_per_month": 2757,
+      "value_per_month": 6894,
+      "net_per_month": 4137,
+      "payback_months": 2.9,
+      "break_even_agent_rate": 6.0,
+      "break_even_volume_at_rate": 3991,
+      "gate": "FAIL",
+      "usable_rate": 1.0,
+      "escalation_recall": 1.0
+    },
+    {
+      "config": "p2-staged",
+      "minutes_per_ticket_with_copilot": 3.06,
+      "minutes_saved_per_ticket": 2.94,
+      "hours_saved_per_month": 491,
+      "fte_equivalent": 3.1,
+      "llm_cost_per_month": 56.74,
+      "eval_cost_per_month": 4.4,
+      "fixed_cost_per_month": 2750,
+      "total_cost_per_month": 2811,
+      "value_per_month": 7360,
+      "net_per_month": 4549,
+      "payback_months": 2.6,
+      "break_even_agent_rate": 5.73,
+      "break_even_volume_at_rate": 3765,
+      "gate": "FAIL",
+      "usable_rate": 0.9759,
+      "escalation_recall": 0.9474
+    }
+  ],
+  "sensitivity": {
+    "p1-haiku": {
+      "rate": {
+        "low": 1007,
+        "base": 4300,
+        "high": 11355
+      },
+      "volume": {
+        "5000": 774,
+        "10000": 4300,
+        "20000": 11352,
+        "50000": 32509,
+        "100000": 67771
+      }
+    },
+    "p1-sonnet": {
+      "rate": {
+        "low": 972,
+        "base": 4288,
+        "high": 11392
+      },
+      "volume": {
+        "5000": 767,
+        "10000": 4288,
+        "20000": 11330,
+        "50000": 32456,
+        "100000": 67667
+      }
+    },
+    "p1-opus": {
+      "rate": {
+        "low": 1158,
+        "base": 4693,
+        "high": 12269
+      },
+      "volume": {
+        "5000": 968,
+        "10000": 4693,
+        "20000": 12143,
+        "50000": 34493,
+        "100000": 71742
+      }
+    },
+    "p1-haiku-cascade": {
+      "rate": {
+        "low": 920,
+        "base": 4137,
+        "high": 11031
+      },
+      "volume": {
+        "5000": 692,
+        "10000": 4137,
+        "20000": 11027,
+        "50000": 31698,
+        "100000": 66148
+      }
+    },
+    "p2-staged": {
+      "rate": {
+        "low": 1114,
+        "base": 4549,
+        "high": 11909
+      },
+      "volume": {
+        "5000": 897,
+        "10000": 4549,
+        "20000": 11852,
+        "50000": 33762,
+        "100000": 70278
+      }
+    }
+  }
+}

@@ -1,0 +1,416 @@
+{
+  "kb_version": "796699cc70",
+  "chunks": [
+    {
+      "id": "deposit/intro",
+      "title": "How to Deposit — overview",
+      "text": "Valetax offers a range of instant, simple and secure funding methods catering to your requirements and preferences",
+      "urls": [
+        "https://valetax.com/how-to-deposit/"
+      ],
+      "pages": [
+        "deposit"
+      ],
+      "kind": "intro",
+      "sha": "66b42b0fdc72",
+      "tags": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "deposit/steps",
+      "title": "How to Deposit — steps",
+      "text": "Step 1: Log in to your Member Area\nStep 2: Select your preferred payment channel Click on the Deposit button and select your preferred payment channel\nStep 3: Enter your account details and amount to deposit\nStep 4: Start Trading!",
+      "urls": [
+        "https://valetax.com/how-to-deposit/"
+      ],
+      "pages": [
+        "deposit"
+      ],
+      "kind": "steps",
+      "sha": "27e0eb169428",
+      "tags": [
+        "deposit"
+      ]
+    },
+    {
+      "id": "faq/minimum-deposit-amount",
+      "title": "What is the minimum deposit amount?",
+      "text": "The minimum deposit starts from 8 USD, depending on the account type.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "bdf326642903",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/deposit-funds-account",
+      "title": "How can I deposit funds into my account?",
+      "text": "You may log in to your member area and select the preferred payment option and deposit size.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "2c5603b2b0be",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/currencies-use-deposit-funds",
+      "title": "What currencies can I use to deposit funds?",
+      "text": "You may deposit using any preferred currency into our USD account, which will follow that day’s exchange rates.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "2ea340ca6157",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/long-does-it-take-deposited-funds-credited",
+      "title": "How long does it take for deposited funds to be credited to my balance?",
+      "text": "Deposits are instant! You will be able to view your updated account balance within 60 minutes.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "d2629ed143de",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/when-funds-available-trading",
+      "title": "When will my funds be available for trading?",
+      "text": "You can begin trading immediately once your balance has been updated.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "285bdb0b4002",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/where-view-deposit-and-withdrawal-history",
+      "title": "Where can I view my deposit and withdrawal history?",
+      "text": "You may log in to your member area to view all transactions related to deposits, withdrawals and transfers.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "58134784ff48",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/withdrawal-request-status-pending",
+      "title": "What is my withdrawal request status ‘pending’?",
+      "text": "This means your request in in queue and in the midst of getting processed. Once approved, you will be notified.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "ce1c28baf057",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/why-was-withdrawal-request-rejected",
+      "title": "Why was my withdrawal request rejected?",
+      "text": "It could be that your account has not been verified, a possible error to data entered or insifficient margin to process withdrawals. We will notify you via email on the rejection reason to help fix this issue.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "3e84cba97a98",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "faq/have-not-received-funds-after-withdrawal-request",
+      "title": "I have not received my funds after my withdrawal request. What should I do?",
+      "text": "Should you not receive your funds within 24 hours, please reach out to our friendly support team for assistance.",
+      "urls": [
+        "https://valetax.com/how-to-deposit/",
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "deposit",
+        "withdraw"
+      ],
+      "kind": "faq",
+      "sha": "fd8e61286da4",
+      "tags": [
+        "deposit",
+        "withdraw"
+      ]
+    },
+    {
+      "id": "withdraw/intro",
+      "title": "How to Withdraw — overview",
+      "text": "We’ve made fund withdrawals easy and instant, providing you with the ultimate convenience and assurance you deserve",
+      "urls": [
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "withdraw"
+      ],
+      "kind": "intro",
+      "sha": "bdaf53e25368",
+      "tags": [
+        "withdraw"
+      ]
+    },
+    {
+      "id": "withdraw/steps",
+      "title": "How to Withdraw — steps",
+      "text": "Step 1: Log in to your Member Area\nStep 2: Select your preferred payment channel\nStep 3: Enter your account details and amount to deposit\nStep 4: Start Trading!",
+      "urls": [
+        "https://valetax.com/how-to-withdraw/"
+      ],
+      "pages": [
+        "withdraw"
+      ],
+      "kind": "steps",
+      "sha": "e0a84fb7e279",
+      "tags": [
+        "withdraw"
+      ]
+    },
+    {
+      "id": "open-account/intro",
+      "title": "How to Open an Account — overview",
+      "text": "Discover a seamless trading experience with us. Open your account with us in 3 quick and simple steps",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "intro",
+      "sha": "1d824cec7b1b",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "open-account/steps",
+      "title": "How to Open an Account — steps",
+      "text": "Step 1: Visit www.valetax.com and click on ‘ Create Account ‘ at the top right of the page\nStep 2: Enter your details in the required fields and proceed to create your account\nStep 3: Upon successful registration, you will be provided access to your own Member Area\nStep 4: Once completed, you’re ready to make your first deposit . Visit How to Deposit for a quick guide to start trading with us!",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "steps",
+      "sha": "f90cc3a936a9",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "faq/sign-up-account",
+      "title": "How do I sign up for an account?",
+      "text": "Click here follow the step-by-step instructions to verify and fund your account to start trading. Opening a live account allows you to begin trading immediately. We recommend clients to read through our Risk Disclosures, Privacy Policy and Terms of Business before they start trading.",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "faq",
+      "sha": "5559224750fc",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "faq/account-type-open",
+      "title": "What account type should I open?",
+      "text": "It will depend on your trading strategy and preferred trading instruments. You may view the various account types here . You may open another account type that suits you better at a later stage too.",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "faq",
+      "sha": "cbef7d1d9ee4",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "faq/minimum-initial-deposit-needed-open-account",
+      "title": "What is the minimum initial deposit needed to open an account?",
+      "text": "It will depend on the account type that is being selected. You may view details of all our accounts here and the minimum deposit that is required for each account type.",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "faq",
+      "sha": "5013a4a24293",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "faq/need-provide-any-documents-open-account",
+      "title": "Do I need to provide any documents to open an account?",
+      "text": "For live accounts, we will require a Proof of identification and Proof of address via a bank statement or a utility bill that are not older than 6 months. Please ensure that your name is clearly displayed in these documents.",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "faq",
+      "sha": "f1633cf2535b",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "faq/long-does-it-take-open-account",
+      "title": "How long does it take to open an account?",
+      "text": "Account opening and document verification will be completed within 48 hours.",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "faq",
+      "sha": "a8b7a729915d",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "faq/leverage-settings-select",
+      "title": "What leverage settings should I select?",
+      "text": "Your leverage setting is dependent on your trading strategy and goals. At Valetax, we offer up to 1:2000 depending on account types. For more details, visit our Account types page here for more details.",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "faq",
+      "sha": "2c1c6edf642f",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "faq/offer-islamic-friendly-account",
+      "title": "Do you offer an Islamic-friendly account?",
+      "text": "All our account are Islamic friendly and there is no swap is credited or withdrawn from all trading account.",
+      "urls": [
+        "https://valetax.com/how-to-open-an-account/"
+      ],
+      "pages": [
+        "open-account"
+      ],
+      "kind": "faq",
+      "sha": "be64eb097ca4",
+      "tags": [
+        "open-account"
+      ]
+    },
+    {
+      "id": "verify/intro",
+      "title": "How to Verify Account — overview",
+      "text": "Identity verification plays a crucial role in ensuring the utmost security and protection against identity theft and fraud",
+      "urls": [
+        "https://valetax.com/how-to-verify-account/"
+      ],
+      "pages": [
+        "verify"
+      ],
+      "kind": "intro",
+      "sha": "b703086d2e52",
+      "tags": [
+        "verify"
+      ]
+    },
+    {
+      "id": "verify/steps",
+      "title": "How to Verify Account — steps",
+      "text": "Step 1: Complete the required fields and upload the required documents to complete your KYC profile\nStep 2: Once completed, you will be taken to this page while your account is being reviewed\nStep 3: Account verification completed ! You’re all set to trade",
+      "urls": [
+        "https://valetax.com/how-to-verify-account/"
+      ],
+      "pages": [
+        "verify"
+      ],
+      "kind": "steps",
+      "sha": "9ade40b217a7",
+      "tags": [
+        "verify"
+      ]
+    }
+  ]
+}

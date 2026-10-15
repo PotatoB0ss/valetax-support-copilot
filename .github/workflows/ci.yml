@@ -1,0 +1,33 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  unit-and-offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run pytest -q
+      - run: uv run python -m evals.run_eval --configs mock --limit 83   # offline smoke run, no key needed
+
+  release-gate:
+    # Any change to prompts, KB, routing or validators must keep the safety gate green on the real model.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changed
+        with:
+          filters: |
+            core: ['copilot/**', 'data/kb/**', 'data/eval/**']
+      - uses: astral-sh/setup-uv@v6
+        if: steps.changed.outputs.core == 'true' && env.ANTHROPIC_API_KEY != ''
+      - if: steps.changed.outputs.core == 'true' && env.ANTHROPIC_API_KEY != ''
+        run: uv sync && uv run python -m evals.run_eval --configs p1-haiku --judge --gate --limit 83
