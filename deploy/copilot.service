@@ -1,0 +1,25 @@
+[Unit]
+Description=Valetax Support Co-pilot (web UI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=copilot
+Group=copilot
+WorkingDirectory=/opt/copilot/app
+ExecStart=/opt/copilot/.local/bin/uv run --frozen --no-dev python -m copilot serve --port 8000
+Restart=on-failure
+RestartSec=3
+Environment=UV_CACHE_DIR=/opt/copilot/.cache/uv
+# hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/copilot
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

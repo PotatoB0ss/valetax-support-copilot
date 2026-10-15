@@ -1,0 +1,16 @@
+145-63-128-218.sslip.io {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8000
+}
+
+# Visiting the bare IP over http goes to the HTTPS site.
+http://145.63.128.218 {
+	redir https://145-63-128-218.sslip.io{uri} permanent
+}

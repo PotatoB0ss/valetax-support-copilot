@@ -5,6 +5,8 @@ reply grounded in the Valetax help pages with citations** (or abstains when the 
 to the right human: an agent for one-click review, or a specialist queue (complaints, compliance, security) for
 anything the co-pilot must never decide.
 
+**Live demo:** https://145-63-128-218.sslip.io (password-protected, HTTPS; deployment in [deploy/](deploy/)).
+
 **→ One-page answer to "is it worth it, and with which configuration": [BUSINESS_CASE.md](BUSINESS_CASE.md)**
 (yes: `p1-sonnet`, ≈3 FTE saved, ≈+$4.3k/month net at 10k tickets, ≈3-month payback).
 
