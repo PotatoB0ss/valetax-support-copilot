@@ -277,6 +277,8 @@ def serve(default: Config, port: int = 8000) -> None:
                 given = (parse_qs(raw.decode("utf-8", "replace")).get("password") or [""])[0]
                 if hmac.compare_digest(given.encode(), password.encode()):
                     cookie = f"cp_session={make_token()}; Path=/; Max-Age={SESSION_HOURS * 3600}; HttpOnly; SameSite=Strict"
+                    if self.headers.get("x-forwarded-proto") == "https":  # behind the TLS proxy
+                        cookie += "; Secure"
                     return self._send(303, b"", headers={"location": "/", "set-cookie": cookie})
                 time.sleep(1.0)  # slow down guessing
                 return self._login_page("Wrong password.", 401)
