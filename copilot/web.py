@@ -3,14 +3,24 @@ helpdesk (Zendesk/Freshdesk app) fed by a webhook — same JSON, different shell
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
+import os
+import secrets
+import time
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
 
 from .config import CONFIGS, Config
 from .pipeline import Copilot
 
+FAV = """<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233b5bdb'/%3E%3Cstop offset='1' stop-color='%237048e8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M18 22h28a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H30l-8 7v-7h-4a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4z' fill='white'/%3E%3Ccircle cx='26' cy='33' r='2.6' fill='%233b5bdb'/%3E%3Ccircle cx='32' cy='33' r='2.6' fill='%235a52e0'/%3E%3Ccircle cx='38' cy='33' r='2.6' fill='%237048e8'/%3E%3C/svg%3E">"""
+
 PAGE = r"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Support Co-pilot</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Valetax Support Co-pilot</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233b5bdb'/%3E%3Cstop offset='1' stop-color='%237048e8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M18 22h28a4 4 0 0 1 4 4v14a4 4 0 0 1-4 4H30l-8 7v-7h-4a4 4 0 0 1-4-4V26a4 4 0 0 1 4-4z' fill='white'/%3E%3Ccircle cx='26' cy='33' r='2.6' fill='%233b5bdb'/%3E%3Ccircle cx='32' cy='33' r='2.6' fill='%235a52e0'/%3E%3Ccircle cx='38' cy='33' r='2.6' fill='%237048e8'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#f4f5f7;--panel:#ffffff;--ink:#16181d;--ink2:#4a4f5a;--mute:#8a909c;--line:#e4e6eb;--soft:#f7f8fa;
@@ -29,6 +39,8 @@ header{display:flex;align-items:center;gap:12px;padding:14px 24px;border-bottom:
 .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--vio));display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px}
 header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
 header .sub{color:var(--mute);font-size:13px}
+header .out{font-size:13px;color:var(--ink2);text-decoration:none;padding:6px 12px;border:1px solid var(--line);border-radius:8px}
+header .out:hover{color:var(--acc);border-color:var(--acc)}
 header .kb{margin-left:auto;font-size:12px;color:var(--mute);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 main{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:20px;padding:20px 24px;max-width:1400px;margin:0 auto}
 @media (max-width:900px){main{grid-template-columns:1fr;padding:16px}}
@@ -93,7 +105,7 @@ footer.meta b{color:var(--ink2);font-weight:600}
 .err{padding:16px 20px;border-left:4px solid var(--bad);color:var(--bad)}
 .fade{animation:f .25s ease-out}@keyframes f{from{transform:translateY(6px)}to{transform:none}}
 </style></head><body>
-<header><div class="logo">C</div><div><h1>Support Co-pilot</h1><div class="sub">Valetax · classify · grounded draft · route</div></div><div class="kb" id="kb"></div></header>
+<header><div class="logo">C</div><div><h1>Support Co-pilot</h1><div class="sub">Valetax · classify · grounded draft · route</div></div><div class="kb" id="kb"></div><a class="out" href="/logout">Sign out</a></header>
 <main>
 <section class="panel left">
   <label class="k" for="t">Customer ticket</label>
@@ -141,6 +153,7 @@ async function run(){
  let d;
  try{const r=await fetch("/api/triage",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,config:sel.value})});d=await r.json()}
  catch(e){d={error_http:"Server not reachable: "+e}}
+ if(d&&d.auth===false){location.href="/";return}
  btn.disabled=false;$("gol").textContent="Analyse ticket";
  if(d.error_http){out.innerHTML=`<div class="panel err fade">${esc(d.error_http)}</div>`;return}
  render(d);
@@ -185,8 +198,46 @@ function render(d){
 </script></body></html>"""
 
 
+LOGIN = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · Valetax Support Co-pilot</title>
+""" + FAV + """<style>
+:root{--bg:#f4f5f7;--panel:#fff;--ink:#16181d;--mute:#8a909c;--line:#e4e6eb;--soft:#f7f8fa;--acc:#3b5bdb;--acc-ink:#fff;--acc-soft:#edf1ff;--bad:#c62828;--bad-soft:#fdecec}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--panel:#171a21;--ink:#e9ebf0;--mute:#7d8492;--line:#262a33;--soft:#1d2129;--acc:#7c96ff;--acc-ink:#0f1115;--acc-soft:#1e2540;--bad:#ff7b72;--bad-soft:#341a1a}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bg);color:var(--ink);font:14.5px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+form{width:100%;max-width:360px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.08)}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,#3b5bdb,#7048e8);display:grid;place-items:center;color:#fff;font-weight:700;margin-bottom:16px}
+h1{font-size:18px;margin:0 0 4px}p{margin:0 0 20px;color:var(--mute);font-size:13.5px}
+label{display:block;font-size:11.5px;font-weight:600;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+input{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--soft);color:var(--ink);outline:none}
+input:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-soft)}
+button{width:100%;margin-top:16px;font:inherit;font-weight:600;padding:11px;border:0;border-radius:10px;background:var(--acc);color:var(--acc-ink);cursor:pointer}
+.err{background:var(--bad-soft);color:var(--bad);font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:14px}
+</style></head><body><form method="post" action="/login"><div class="logo">C</div>
+<h1>Valetax Support Co-pilot</h1><p>Internal tool for the support team. Sign in to continue.</p>__ERR__
+<label for="p">Password</label><input id="p" name="password" type="password" autocomplete="current-password" autofocus required>
+<button type="submit">Sign in</button></form></body></html>"""
+
+SESSION_HOURS = 12
+
+
 def serve(default: Config, port: int = 8000) -> None:
     import html
+
+    # Minimal shared-password auth (stub for SSO): password from COPILOT_PASSWORD, signed session cookie.
+    password = os.environ.get("COPILOT_PASSWORD") or ""
+    if not password:
+        password = secrets.token_urlsafe(9)
+        print(f"COPILOT_PASSWORD not set -> generated one for this run: {password}")
+    key = secrets.token_bytes(32)  # per-process: restarting the server signs everyone out
+
+    def make_token() -> str:
+        exp = str(int(time.time()) + SESSION_HOURS * 3600)
+        return exp + "." + hmac.new(key, exp.encode(), hashlib.sha256).hexdigest()
+
+    def valid(token: str) -> bool:
+        exp, _, sig = token.partition(".")
+        good = hmac.new(key, exp.encode(), hashlib.sha256).hexdigest()
+        return exp.isdigit() and int(exp) > time.time() and hmac.compare_digest(sig, good)
 
     opts = "".join(f'<option value="{n}"{" selected" if n == default.name else ""}>{html.escape(n)}</option>' for n in CONFIGS)
     descs = json.dumps({n: c.description for n, c in CONFIGS.items()}, ensure_ascii=False).replace("</", "<\\/")
@@ -196,22 +247,46 @@ def serve(default: Config, port: int = 8000) -> None:
         def log_message(self, *a):  # keep the console quiet
             pass
 
-        def do_GET(self):
-            self.send_response(200)
-            self.send_header("content-type", "text/html; charset=utf-8")
+        def _authed(self) -> bool:
+            c = SimpleCookie(self.headers.get("cookie") or "")
+            return "cp_session" in c and valid(c["cp_session"].value)
+
+        def _send(self, code: int, body: bytes, ctype: str = "text/html; charset=utf-8", headers: dict | None = None):
+            self.send_response(code)
+            self.send_header("content-type", ctype)
+            self.send_header("cache-control", "no-store")
+            for k, v in (headers or {}).items():
+                self.send_header(k, v)
             self.end_headers()
-            self.wfile.write(page)
+            self.wfile.write(body)
+
+        def _login_page(self, error: str = "", code: int = 200):
+            err = f'<div class="err">{html.escape(error)}</div>' if error else ""
+            self._send(code, LOGIN.replace("__ERR__", err).encode())
+
+        def do_GET(self):
+            if self.path.startswith("/logout"):
+                return self._send(303, b"", headers={"location": "/", "set-cookie": "cp_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"})
+            if not self._authed():
+                return self._login_page()
+            self._send(200, page)
 
         def do_POST(self):
-            body = json.loads(self.rfile.read(int(self.headers["content-length"])) or b"{}")
+            raw = self.rfile.read(int(self.headers.get("content-length") or 0))
+            if self.path.startswith("/login"):
+                given = (parse_qs(raw.decode("utf-8", "replace")).get("password") or [""])[0]
+                if hmac.compare_digest(given.encode(), password.encode()):
+                    cookie = f"cp_session={make_token()}; Path=/; Max-Age={SESSION_HOURS * 3600}; HttpOnly; SameSite=Strict"
+                    return self._send(303, b"", headers={"location": "/", "set-cookie": cookie})
+                time.sleep(1.0)  # slow down guessing
+                return self._login_page("Wrong password.", 401)
+            if not self._authed():
+                return self._send(401, b'{"auth": false}', "application/json")
+            body = json.loads(raw or b"{}")
             cfg = CONFIGS.get(body.get("config"), default)
             text = (body.get("text") or "").strip()
             res = {"error_http": "empty ticket"} if not text else asyncio.run(Copilot(cfg).process_many([{"id": "web", "text": text}]))[0]
-            data = json.dumps(res, ensure_ascii=False).encode()
-            self.send_response(200)
-            self.send_header("content-type", "application/json")
-            self.end_headers()
-            self.wfile.write(data)
+            self._send(200, json.dumps(res, ensure_ascii=False).encode(), "application/json")
 
     print(f"Co-pilot UI on http://127.0.0.1:{port}  (default config {default.name})")
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()

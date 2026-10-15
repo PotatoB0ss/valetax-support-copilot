@@ -36,6 +36,7 @@ What is mocked or stubbed in this repo, and what the real version does:
 | Stub here | Real version |
 |---|---|
 | CLI / stdlib web page | Helpdesk sidebar app; webhook on ticket-created; writes internal note + tags + assignee group |
+| Shared password + signed session cookie (12 h) | Company SSO (OIDC/SAML) with per-agent identity, roles (agent / specialist / admin), audit log of who sent which draft |
 | KB = 4 HTML snapshots parsed at build time | Scheduled crawler / CMS export → chunker → content-hash diff → re-index + re-run eval when `kb_version` changes |
 | Synthetic labelled eval set (83 tickets) | 300–500 real historical tickets, PII-redacted, double-labelled by support leads; refreshed monthly from agent edits |
 | LLM judge only | Judge calibrated against ~50 human ratings; online metric = agent edit distance and "sent as is" rate |

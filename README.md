@@ -16,16 +16,36 @@ anything the co-pilot must never decide.
 | [docs/KB_AUDIT.md](docs/KB_AUDIT.md) | Gaps, duplicates and contradictions in the 4 KB pages, and how the co-pilot handles each |
 | [results/scale_sim.md](results/scale_sim.md) | Phase 2 simulation: retrieval recall and cost as the KB grows to 20k chunks |
 
+## Brief → where it is done
+
+| Requirement in the brief | Where |
+|---|---|
+| Classify: category, urgency, language, sentiment | `copilot/schema.py`, rubric in `copilot/prompts.py`; measured in `results/SUMMARY.md` |
+| Draft grounded in the KB with citations, or abstain | `claims[{chunk_id, quote}]` + validator (`copilot/guardrails.py`); `response_mode = abstain` |
+| Route to a human reviewer whenever required | `copilot/routing.py` (agent review / manual / complaints / compliance / security) |
+| Never give trading advice | prompt rule + multilingual rules + draft detector; 100% declined in eval |
+| Never decide complaint/KYC/AML outcomes | specialist queues + outcome-promise detector; 100% escalation recall |
+| Never invent policy, fees, timelines | verbatim-quote + grounded-number checks; judge faithfulness; release gate |
+| KB = 4 Valetax pages, as they are | `data/kb_raw/` snapshots, `docs/KB_AUDIT.md` (gaps, overlaps, inconsistencies) |
+| Phase 1 ship ASAP / Phase 2 scale (10k/month, growing KB/SOPs) | `docs/ARCHITECTURE.md`, `p2-staged` config, `results/scale_sim.md` |
+| Measure it | `evals/` (83 labelled tickets, 6 configs, judge, CI gate) |
+| Business case on one page: worth it, which configuration | [BUSINESS_CASE.md](BUSINESS_CASE.md) |
+| Python; any LLM provider | Python 3.12; Claude (Haiku / Sonnet / Opus 5.5) via the official `anthropic` SDK, structured outputs, prompt caching |
+| Built with an agentic coding tool | Built with Claude Code |
+| Minimal CLI or simple web page | `python -m copilot triage/batch` and `python -m copilot serve` (password-protected web UI) |
+| Mocks/stubs explained | [ARCHITECTURE.md → what is stubbed](docs/ARCHITECTURE.md#phase-1-what-ships-in-week-1) |
+
 ## Quick start
 
 ```bash
 uv sync                                          # Python 3.12, deps: anthropic, beautifulsoup4
 echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env        # or export it
+echo 'COPILOT_PASSWORD=choose-a-password' >> .env # web UI password (if unset, one is generated and printed)
 
 uv run python -m copilot triage "Какой минимальный депозит? И стоит ли сейчас покупать золото?"
 uv run python -m copilot --config p1-haiku triage "My withdrawal is pending for 6 days, you are scammers"
 uv run python -m copilot batch data/eval/tickets.jsonl -o out.jsonl
-uv run python -m copilot serve                   # minimal web UI on http://127.0.0.1:8000
+uv run python -m copilot serve                   # web UI on http://127.0.0.1:8000 (password login, Opus by default)
 uv run python -m copilot configs                 # list configurations
 
 uv run pytest -q                                 # 32 unit tests, offline
