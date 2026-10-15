@@ -105,6 +105,11 @@ ul.plain{margin:0;padding-left:18px;color:var(--ink2)}
 footer.meta{display:flex;flex-wrap:wrap;gap:18px;font-size:12.5px;color:var(--mute);padding:2px 4px}
 footer.meta b{color:var(--ink2);font-weight:600}
 .err{padding:16px 20px;border-left:4px solid var(--bad);color:var(--bad)}
+.pill.checking{background:var(--acc-soft);color:var(--acc)}
+.ghost{display:inline-block;width:70px;height:12px;border-radius:6px;background:var(--line);animation:pulse 1.2s ease-in-out infinite}.ghost.wide{width:160px}
+@keyframes pulse{50%{opacity:.4}}
+.caret{display:inline-block;width:7px;height:1.05em;margin-left:2px;vertical-align:text-bottom;background:var(--acc);animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
 .fade{animation:f .25s ease-out}@keyframes f{from{transform:translateY(6px)}to{transform:none}}
 </style></head><body>
 <header><div class="logo">C</div><div><h1>Support Co-pilot</h1><div class="sub">Valetax · classify · grounded draft · route</div></div><div class="kb" id="kb"></div><form method="post" action="/logout" style="margin:0"><button class="out" type="submit">Sign out</button></form></header>
@@ -152,13 +157,37 @@ $("go").onclick=run;
 async function run(){
  const text=ta.value.trim();if(!text){ta.focus();return}
  const btn=$("go");btn.disabled=true;$("gol").innerHTML='<span class="spin"></span>';$("gol").insertAdjacentText("beforeend"," Analysing…");
- let d;
- try{const r=await fetch("/api/triage",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,config:sel.value})});d=await r.json()}
- catch(e){d={error_http:"Server not reachable: "+e}}
- if(d&&d.auth===false){location.href="/";return}
- btn.disabled=false;$("gol").textContent="Analyse ticket";
- if(d.error_http){out.innerHTML=`<div class="panel err fade">${esc(d.error_http)}</div>`;return}
- render(d);
+ const done=()=>{btn.disabled=false;$("gol").textContent="Analyse ticket"};
+ const fail=m=>{done();out.innerHTML=`<div class="panel err fade">${esc(m)}</div>`};
+ const t0=performance.now();let gotFinal=false;
+ try{
+  const r=await fetch("/api/triage/stream",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({text,config:sel.value})});
+  if(r.status===401){location.href="/";return}
+  if(!r.ok||!r.body){let m="Request failed ("+r.status+")";try{m=(await r.json()).error_http||m}catch(e){}return fail(m)}
+  const rd=r.body.getReader(),dec=new TextDecoder();let buf="";
+  while(true){
+   const {value,done:eof}=await rd.read();if(eof)break;
+   buf+=dec.decode(value,{stream:true});let i;
+   while((i=buf.indexOf("\n\n"))>=0){
+    const raw=buf.slice(0,i);buf=buf.slice(i+2);
+    const ev=(raw.match(/^event: (.*)$/m)||[])[1],data=(raw.match(/^data: (.*)$/m)||[])[1];
+    if(!data)continue;const obj=JSON.parse(data);
+    if(ev==="final"){gotFinal=true;done();render(obj)}else renderPartial(obj,(performance.now()-t0)/1000);
+   }
+  }
+  if(!gotFinal)fail("Connection closed before the result was ready. Please retry.");
+ }catch(e){fail("Server not reachable: "+e)}
+}
+function renderPartial(p,secs){
+ const c=p;const flags=(p.risk_flags||[]).map(f=>`<span class="flag ${f.startsWith("trading")?"adv":f==="prompt_injection"?"inj":""}">${esc(f.replace(/_/g," "))}</span>`).join("");
+ const cell=(k,v)=>`<div class="cell"><div class="k">${k}</div><div class="v">${v?esc(v.replace(/_/g," ")):'<span class="ghost"></span>'}</div></div>`;
+ out.innerHTML=`
+ <div class="panel route" style="--q:var(--acc);--qs:var(--acc-soft)"><div class="qicon"><span class="spin"></span></div>
+  <div><div class="qname">Analysing…</div><div class="qsub">Routing and validation run when the draft is complete · ${secs.toFixed(1)}s</div></div><div></div></div>
+ <div class="grid4">${cell("Category",c.category)}${cell("Urgency",c.urgency)}${cell("Language",LANG[c.language]||c.language)}${cell("Sentiment",c.sentiment)}</div>
+ <div class="panel card"><div class="cardhead"><span class="k">Risk flags</span></div><div class="flags">${flags||(p.risk_flags?'<span class="note">No risk flags</span>':'<span class="ghost wide"></span>')}</div></div>
+ <div class="panel card"><div class="cardhead"><span class="k">Draft reply</span><span class="pill checking">Checking…</span>${p.response_mode?`<span class="pill mode">${esc(p.response_mode)}</span>`:""}</div>
+  ${p.draft_reply?`<div class="draft">${esc(p.draft_reply)}<span class="caret"></span></div>`:'<div class="note">Writing the draft…</div>'}</div>`;
 }
 function render(d){
  $("kb").textContent=`kb ${d.kb_version} · prompt ${d.prompt_version}`;
@@ -404,6 +433,8 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
                 return self._login()
             if path == "/api/triage":
                 return self._triage()
+            if path == "/api/triage/stream":
+                return self._triage_stream()
             self._send(404, b"Not found", "text/plain")
 
         def _login(self):
@@ -423,7 +454,8 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
             login_limiter.record(ip)  # only failures count towards the lockout
             return self._login_page("Wrong password.", 401)
 
-        def _triage(self):
+        def _prepare(self):
+            """All checks shared by both endpoints. Returns (text, cfg) or None after sending an error."""
             if not self._authed():
                 return self._json(401, {"auth": False})
             if (self.headers.get("content-type") or "").split(";")[0].strip().lower() != "application/json":
@@ -449,13 +481,70 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
                 return self._json(429, {"error_http": refused})
             if not inflight.acquire(blocking=False):
                 return self._json(503, {"error_http": "Co-pilot is busy, please retry in a few seconds."})
+            cfg = CONFIGS.get(str(body.get("config")), default)
+            if cfg.backend == "anthropic":
+                cfg = cfg.with_(cache_ttl="1h")  # sparse demo traffic: keep the KB prefix cached between visits
+            return text, cfg
+
+        def _triage(self):
+            prep = self._prepare()
+            if prep is None:
+                return
+            text, cfg = prep
             try:
-                cfg = CONFIGS.get(str(body.get("config")), default)
                 res = asyncio.run(Copilot(cfg).process_many([{"id": "web", "text": text}]))[0]
                 budget.spend(res["usage"]["cost_usd"])
             finally:
                 inflight.release()
             self._json(200, res)
+
+        def _triage_stream(self):
+            """Server-Sent Events: `partial` events while the model writes (classification first, then the
+            draft as it is generated), then one `final` event with the validated, routed result."""
+            prep = self._prepare()
+            if prep is None:
+                return
+            text, cfg = prep
+            self.close_connection = True
+            alive = True
+
+            def emit(event: str, obj: dict) -> None:
+                nonlocal alive
+                if not alive:
+                    return
+                try:
+                    self.wfile.write(f"event: {event}\ndata: {json.dumps(obj, ensure_ascii=False)}\n\n".encode())
+                    self.wfile.flush()
+                except OSError:  # client went away; finish the call (already paid for) but stop writing
+                    alive = False
+
+            last = {"t": 0.0, "view": None}
+
+            def on_partial(view: dict) -> None:
+                now = time.monotonic()
+                if view != last["view"] and (now - last["t"] > 0.06 or view.get("draft_complete")):
+                    last.update(t=now, view=view)
+                    emit("partial", view)
+
+            try:
+                self.send_response(200)
+                for k, v in {**SECURITY_HEADERS, "content-type": "text/event-stream; charset=utf-8",
+                             "x-accel-buffering": "no", "connection": "close"}.items():
+                    self.send_header(k, v)
+                self.end_headers()
+
+                async def run():
+                    cp = Copilot(cfg)
+                    try:
+                        return await cp.process(text, "web", on_partial=on_partial)
+                    finally:
+                        await cp.aclose()
+
+                res = asyncio.run(run())
+                budget.spend(res["usage"]["cost_usd"])
+                emit("final", res)
+            finally:
+                inflight.release()
 
     srv = ThreadingHTTPServer((host, port), H)
     srv.daemon_threads = True

@@ -29,6 +29,7 @@ class Config:
     rules: bool = True               # OR deterministic risk rules into the LLM's flags
     cascade_model: str | None = None # re-run with this model when the draft is blocked by validation
     backend: str = "anthropic"       # "anthropic" | "mock"
+    cache_ttl: str | None = None     # prompt-cache TTL: None = 5 min default; "1h" for sparse traffic (demo UI)
     description: str = ""
 
     def with_(self, **kw) -> "Config":

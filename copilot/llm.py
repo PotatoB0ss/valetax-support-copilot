@@ -49,23 +49,37 @@ class AnthropicBackend:
         self.client = anthropic.AsyncAnthropic(max_retries=4, timeout=120.0)
         self.sem = asyncio.Semaphore(max_concurrency)
 
-    async def _call(self, step: str, model: str, system: str, user: str, schema: dict, max_tokens: int = 6000) -> tuple[dict, CallStat]:
+    async def _call(self, step: str, model: str, system: str, user: str, schema: dict, max_tokens: int = 6000,
+                    on_text=None) -> tuple[dict, CallStat]:
+        """One structured call. With `on_text`, the response is streamed and `on_text(json_so_far)` is called
+        on every text delta (used by the web UI to show classification and the draft while it is generated)."""
+        cache = {"type": "ephemeral", **({"ttl": self.cfg.cache_ttl} if self.cfg.cache_ttl else {})}
         async with self.sem:
             t0 = time.perf_counter()
             kwargs = dict(
                 model=model,
                 max_tokens=max_tokens,
                 # Stable prefix (rules + KB) is cached; the ticket is the only per-request part.
-                system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+                system=[{"type": "text", "text": system, "cache_control": cache}],
                 messages=[{"role": "user", "content": user}],
                 output_config={"effort": self.cfg.effort, "format": {"type": "json_schema", "schema": schema}},
             )
             if model in FALLBACK_MODELS:
                 # Server-side refusal fallback: if a safety classifier declines, the API re-runs the
                 # request on Anthropic's recommended fallback model inside the same call.
-                resp = await self.client.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kwargs)
+                api, kwargs = self.client.beta.messages, {**kwargs, "betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
             else:
-                resp = await self.client.messages.create(**kwargs)
+                api = self.client.messages
+            if on_text is None:
+                resp = await api.create(**kwargs)
+            else:
+                buf = []
+                async with api.stream(**kwargs) as stream:
+                    async for ev in stream:
+                        if ev.type == "content_block_delta" and getattr(ev.delta, "type", "") == "text_delta":
+                            buf.append(ev.delta.text)
+                            on_text("".join(buf))
+                    resp = await stream.get_final_message()
             dt = time.perf_counter() - t0
         u = resp.usage
         usage = {
@@ -82,14 +96,14 @@ class AnthropicBackend:
         text = next(b.text for b in resp.content if b.type == "text")
         return json.loads(text), stat
 
-    async def single(self, ticket: str, chunks: list[Chunk], model: str) -> tuple[dict, CallStat]:
-        return await self._call("single", model, prompts.single_system(chunks), prompts.ticket_message(ticket), SINGLE_SCHEMA)
+    async def single(self, ticket: str, chunks: list[Chunk], model: str, on_text=None) -> tuple[dict, CallStat]:
+        return await self._call("single", model, prompts.single_system(chunks), prompts.ticket_message(ticket), SINGLE_SCHEMA, on_text=on_text)
 
     async def triage(self, ticket: str) -> tuple[dict, CallStat]:
         return await self._call("triage", self.cfg.triage_model, prompts.TRIAGE_SYSTEM, prompts.ticket_message(ticket), TRIAGE_SCHEMA, 3000)
 
-    async def draft(self, ticket: str, triage: dict, chunks: list[Chunk], model: str) -> tuple[dict, CallStat]:
-        return await self._call("draft", model, prompts.DRAFT_SYSTEM, prompts.draft_message(ticket, triage, chunks), DRAFT_SCHEMA)
+    async def draft(self, ticket: str, triage: dict, chunks: list[Chunk], model: str, on_text=None) -> tuple[dict, CallStat]:
+        return await self._call("draft", model, prompts.DRAFT_SYSTEM, prompts.draft_message(ticket, triage, chunks), DRAFT_SCHEMA, on_text=on_text)
 
 
 # ------------------------------------------------------------------------------------------- mock
@@ -145,7 +159,7 @@ class MockBackend:
         return {"response_mode": "answer", "draft_reply": f"Hello,\n\n{sentence}\n\nValetax Support",
                 "claims": [{"chunk_id": c.id, "quote": sentence}], "unanswered_questions": [], "internal_note": "Mock draft (top BM25 hit)."}
 
-    async def single(self, ticket: str, chunks: list[Chunk], model: str):
+    async def single(self, ticket: str, chunks: list[Chunk], model: str, on_text=None):
         t = self._triage(ticket)
         t.pop("search_query_en")
         return {**t, **self._draft(ticket, {**t, "search_query_en": ticket}, chunks)}, CallStat("single", "mock", 0.0)
@@ -153,5 +167,5 @@ class MockBackend:
     async def triage(self, ticket: str):
         return self._triage(ticket), CallStat("triage", "mock", 0.0)
 
-    async def draft(self, ticket: str, triage: dict, chunks: list[Chunk], model: str):
+    async def draft(self, ticket: str, triage: dict, chunks: list[Chunk], model: str, on_text=None):
         return self._draft(ticket, triage, chunks), CallStat("draft", "mock", 0.0)

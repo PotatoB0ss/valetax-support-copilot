@@ -8,6 +8,8 @@ Optional cascade: if validation blocks the draft, re-draft once with a stronger 
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 import time
 from typing import Any
 
@@ -18,6 +20,42 @@ from .prompts import PROMPT_VERSION
 from .llm import AnthropicBackend, LLMRefusal, MockBackend
 from .retrieval import BM25
 from .routing import route
+
+_STR_FIELDS = ("language", "category", "urgency", "sentiment", "response_mode")
+
+
+def _decode_partial_string(s: str) -> str:
+    """Decode a JSON string body that may be cut mid-escape (streaming)."""
+    for cut in range(0, 7):  # drop an incomplete trailing escape such as \ or \u04
+        try:
+            return json.loads('"' + (s[:-cut] if cut else s) + '"')
+        except ValueError:
+            continue
+    return ""
+
+
+def partial_view(buf: str) -> dict:
+    """Best-effort view of a JSON object that is still being streamed: completed string fields, a closed
+    risk_flags array, and the draft_reply decoded so far. Never raises."""
+    view: dict = {}
+    for k in _STR_FIELDS:
+        m = re.search(r'"%s"\s*:\s*"((?:[^"\\]|\\.)*)"' % k, buf)
+        if m:
+            view[k] = _decode_partial_string(m.group(1))
+    m = re.search(r'"risk_flags"\s*:\s*(\[[^\]]*\])', buf)
+    if m:
+        try:
+            view["risk_flags"] = json.loads(m.group(1))
+        except ValueError:
+            pass
+    m = re.search(r'"draft_reply"\s*:\s*"', buf)
+    if m:
+        rest = buf[m.end():]
+        end = re.search(r'(?<!\\)(?:\\\\)*"', rest)
+        body = rest[: end.end() - 1] if end else rest
+        view["draft_reply"] = _decode_partial_string(body)
+        view["draft_complete"] = bool(end)
+    return view
 
 TRIAGE_KEYS = ("language", "category", "urgency", "sentiment")
 
@@ -31,22 +69,27 @@ class Copilot:
         self.by_id = {c.id: c for c in self.chunks}
         self.backend = MockBackend(cfg, self.chunks) if cfg.backend == "mock" else AnthropicBackend(cfg, max_concurrency)
 
-    async def _generate(self, ticket: str, model: str) -> tuple[dict, list[Chunk], list]:
-        """Returns (merged triage+draft output, chunks the model saw, call stats)."""
+    async def _generate(self, ticket: str, model: str, on_partial=None) -> tuple[dict, list[Chunk], list]:
+        """Returns (merged triage+draft output, chunks the model saw, call stats).
+        `on_partial(dict)` (optional) receives the fields decoded so far while the model streams."""
+        on_text = (lambda known: (lambda buf: on_partial({**known, **partial_view(buf)})))
         if self.cfg.mode == "single":
-            out, stat = await self.backend.single(ticket, self.chunks, model)
+            out, stat = await self.backend.single(ticket, self.chunks, model, on_text=on_text({}) if on_partial else None)
             return out, self.chunks, [stat]
         tri, s1 = await self.backend.triage(ticket)
+        if on_partial:
+            on_partial({k: tri.get(k) for k in (*TRIAGE_KEYS, "risk_flags")})
         provided = self.bm25.search(tri.get("search_query_en") or ticket, k=self.cfg.top_k) if self.cfg.retrieval == "bm25" else self.chunks
-        dr, s2 = await self.backend.draft(ticket, tri, provided, model)
+        dr, s2 = await self.backend.draft(ticket, tri, provided, model,
+                                          on_text=on_text({k: tri.get(k) for k in (*TRIAGE_KEYS, "risk_flags")}) if on_partial else None)
         return {**tri, **dr}, provided, [s1, s2]
 
-    async def process(self, ticket: str, ticket_id: str = "") -> dict[str, Any]:
+    async def process(self, ticket: str, ticket_id: str = "", on_partial=None) -> dict[str, Any]:
         t0 = time.perf_counter()
         rule_hits = detect_risks(ticket) if self.cfg.rules else {}
         calls, error, out, provided, cascaded = [], None, {}, self.chunks, False
         try:
-            out, provided, calls = await self._generate(ticket, self.cfg.model)
+            out, provided, calls = await self._generate(ticket, self.cfg.model, on_partial)
         except LLMRefusal as e:
             error = str(e)
         except Exception as e:  # network / schema / max_tokens: never lose the ticket, route to a human

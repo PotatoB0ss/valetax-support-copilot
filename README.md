@@ -48,10 +48,11 @@ echo 'COPILOT_PASSWORD=choose-a-password' >> .env # web UI password (if unset, o
 uv run python -m copilot triage "Какой минимальный депозит? И стоит ли сейчас покупать золото?"
 uv run python -m copilot --config p1-haiku triage "My withdrawal is pending for 6 days, you are scammers"
 uv run python -m copilot batch data/eval/tickets.jsonl -o out.jsonl
-uv run python -m copilot serve                   # web UI on http://127.0.0.1:8000 (password login, Opus by default)
+uv run python -m copilot serve                   # web UI on http://127.0.0.1:8000 (password login, Opus, streamed:
+                                                 #   classification ~1s, draft types out, validated result ~3.5s)
 uv run python -m copilot configs                 # list configurations
 
-uv run pytest -q                                 # 50 tests (core + guardrails + web security + budgets), offline
+uv run pytest -q                                 # 53 tests (core + guardrails + web security + budgets + streaming), offline
 uv run python -m evals.run_eval --configs mock   # offline eval (rules-only baseline), no key needed
 uv run python -m evals.run_eval --configs p1-sonnet,p1-haiku --judge   # real eval + LLM judge (~$1.5)
 uv run python -m evals.run_eval --configs p1-sonnet --judge --gate     # CI release gate (exit 1 on failure)

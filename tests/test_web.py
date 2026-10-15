@@ -168,3 +168,30 @@ def test_budget_resets_next_day(monkeypatch):
     assert b.take() is None and b.take() is not None
     monkeypatch.setattr(web.time, "strftime", lambda *a: "2026-01-02")
     assert b.take() is None
+
+
+def _sse(port, cookie, payload, ip="3.3.3.3"):
+    st, h, body = req(port, "POST", "/api/triage/stream", json.dumps(payload).encode(),
+                      {"content-type": "application/json", "cookie": cookie, "x-forwarded-for": ip})
+    events = []
+    for block in body.decode().split("\n\n"):
+        lines = dict(l.split(": ", 1) for l in block.splitlines() if ": " in l)
+        if "data" in lines:
+            events.append((lines.get("event"), json.loads(lines["data"])))
+    return st, h, events
+
+
+def test_stream_endpoint_requires_auth_and_returns_final_event(server):
+    assert _sse(server, "", {"text": "hi"})[0] == 401
+    _, cookie = login(server)
+    st, h, events = _sse(server, cookie, {"text": "I was hacked, unauthorized withdrawal", "config": "mock"})
+    assert st == 200 and h["content-type"].startswith("text/event-stream")
+    assert "frame-ancestors 'none'" in h["content-security-policy"]
+    assert events[-1][0] == "final" and events[-1][1]["routing"]["queue"] == "security"
+
+
+def test_stream_endpoint_shares_validation_and_rate_limit(server):
+    _, cookie = login(server)
+    assert _sse(server, cookie, {"text": "x" * (web.MAX_TICKET_CHARS + 1)})[0] == 400
+    codes = [_sse(server, cookie, {"text": "min deposit?", "config": "mock"}, ip="2.2.2.2")[0] for _ in range(web.API_PER_MINUTE + 1)]
+    assert codes[-1] == 429

@@ -187,3 +187,14 @@ def test_own_domain_and_decimals_are_allowed(chunks):
     d = _draft("Hello,\n\nVisit www.valetax.com and click on 'Create Account'.\n\nValetax Support",
                [{"chunk_id": "open-account/steps", "quote": "Visit www.valetax.com and click on"}])
     assert "foreign_link" not in {i.code for i in validate_draft(d, "how to open? I have 1.5 BTC", chunks, set())}
+
+
+def test_partial_view_while_streaming():
+    from copilot.pipeline import partial_view
+    buf = ('{"language":"ru","category":"deposit","risk_flags":["trading_advice_request"],'
+           '"response_mode":"partial","draft_reply":"Здравствуйте,\\n\\"8 USD\\" \\u04')
+    v = partial_view(buf)
+    assert v["category"] == "deposit" and v["risk_flags"] == ["trading_advice_request"]
+    assert v["draft_reply"] == 'Здравствуйте,\n"8 USD" ' and v["draft_complete"] is False
+    assert partial_view(buf + '1", "claims": []}')["draft_complete"] is True
+    assert partial_view('{"categ') == {}  # never raises on garbage

@@ -1,5 +1,7 @@
 145-63-128-218.sslip.io {
-	encode zstd gzip
+	# Compression would buffer Server-Sent Events, so the streaming endpoint is excluded.
+	@compressible not path /api/triage/stream
+	encode @compressible zstd gzip
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"

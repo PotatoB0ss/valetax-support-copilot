@@ -15,6 +15,7 @@ This page lists what can go wrong and what stops it. Each web control has a test
 | **CSRF** | SameSite=Strict. API accepts only `application/json` (a cross-site HTML form can't send it). Logout is POST. | `web.py` |
 | **XSS** (LLM output or ticket text rendered in the page) | Every dynamic value is HTML-escaped before insertion. Strict CSP (`default-src 'none'`, no external origins, `frame-ancestors 'none'`). | `web.py` |
 | **Clickjacking, MIME sniffing, referrer leaks** | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, HSTS at the proxy. | `web.py`, Caddy |
+| **Streaming endpoint** (`/api/triage/stream`, SSE) | Same `_prepare()` path as the JSON API: auth, size caps, rate limit, daily budgets, in-flight cap (tested). The streamed draft is labelled *Checking…* and shows no route until validation and routing finish, so an unvalidated draft never looks ready to send. | `web.py` |
 | **Slow clients / resource exhaustion** | 30 s socket timeout. Body size checked before reading. Rate-limiter memory bounded. TLS terminated by Caddy. | `web.py` |
 | **Spoofed client IP to dodge rate limits** | The app listens on `127.0.0.1` only. `X-Forwarded-For` is trusted only when the peer is the local proxy, and Caddy overwrites client-supplied values. | `web.py`, deployment |
 | **Secrets in the repo** | `.env` is git-ignored. Keys only come from the environment. The repo history was checked for keys and tokens before publishing. | `.gitignore` |
