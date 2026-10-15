@@ -48,7 +48,7 @@ def gate(m: dict) -> list[str]:
     return fails
 
 
-async def run_config(name: str, gold: list[dict], do_judge: bool, concurrency: int, rejudge: bool = False) -> dict:
+async def run_config(name: str, gold: list[dict], do_judge: bool, concurrency: int, rejudge: bool = False, out_root: Path = RESULTS) -> dict:
     cfg = CONFIGS[name]
     cp = Copilot(cfg, max_concurrency=concurrency)
     t0 = time.perf_counter()
@@ -82,7 +82,7 @@ async def run_config(name: str, gold: list[dict], do_judge: bool, concurrency: i
     m["wall_clock_s"] = round(wall, 1)
     m["judge_cost_usd"] = round(judge_cost, 4)
     m["gate_failures"] = gate(m)
-    d = RESULTS / name
+    d = out_root / name
     d.mkdir(parents=True, exist_ok=True)
     (d / "outputs.jsonl").write_text("".join(json.dumps(outs[g["id"]], ensure_ascii=False) + "\n" for g in gold), encoding="utf-8")
     (d / "metrics.json").write_text(json.dumps(m, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -164,7 +164,9 @@ def main():
     ms = []
     for name in a.configs.split(","):
         print(f"→ {name} on {len(gold)} tickets…", flush=True)
-        m = asyncio.run(run_config(name, gold, a.judge or a.rejudge, a.concurrency, a.rejudge))
+        partial = bool(a.only or a.limit)  # partial runs go to results/_scratch (git-ignored), never over committed results
+        m = asyncio.run(run_config(name, gold, a.judge or a.rejudge, a.concurrency, a.rejudge,
+                                   RESULTS / "_scratch" if partial and not a.rejudge else RESULTS))
         ms.append(m)
         print(f"  escalation recall {fmt(m['escalation']['recall'])} · category {fmt(m['classification']['category_acc'])} · "
               f"mode {fmt(m['mode_acc'])} · ${m['ops']['cost_per_ticket_usd']:.5f}/ticket · gate {'PASS' if not m['gate_failures'] else 'FAIL'}", flush=True)

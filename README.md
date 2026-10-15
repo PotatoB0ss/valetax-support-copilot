@@ -51,7 +51,7 @@ uv run python -m copilot batch data/eval/tickets.jsonl -o out.jsonl
 uv run python -m copilot serve                   # web UI on http://127.0.0.1:8000 (password login, Opus by default)
 uv run python -m copilot configs                 # list configurations
 
-uv run pytest -q                                 # 43 tests (core + web security), offline
+uv run pytest -q                                 # 50 tests (core + guardrails + web security + budgets), offline
 uv run python -m evals.run_eval --configs mock   # offline eval (rules-only baseline), no key needed
 uv run python -m evals.run_eval --configs p1-sonnet,p1-haiku --judge   # real eval + LLM judge (~$1.5)
 uv run python -m evals.run_eval --configs p1-sonnet --judge --gate     # CI release gate (exit 1 on failure)
@@ -86,7 +86,8 @@ ticket ─┬─ rules (multilingual regex: advice / complaint / KYC / AML / sec
         └─ Claude, 1 call, structured JSON: classification + flags + draft + claims[{chunk_id, quote}]  │
                      (system prompt = rules + whole KB, prompt-cached)                                  │
            ─▶ validator: citation exists · quote is verbatim in chunk · every number grounded ·        │
-                         no advice phrasing · no outcome promises · reply in customer's script          │
+                         no advice phrasing · no outcome promises · reply in customer's script ·        │
+                         links/emails only on valetax.com                                               │
            ─▶ router (deterministic): flags ∪ rules → specialist queue | blocked/abstain → agent_manual │
                                       | else agent_review (ready / needs_edit) ◀──────────────────────┘
 ```

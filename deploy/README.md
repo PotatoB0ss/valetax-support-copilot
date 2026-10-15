@@ -19,7 +19,7 @@ apt install caddy                                   # from the official Caddy ap
 useradd --system --create-home --home-dir /opt/copilot --shell /usr/sbin/nologin copilot
 sudo -u copilot -H sh -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
 git clone https://github.com/PotatoB0ss/valetax-support-copilot /opt/copilot/app
-install -m 600 -o copilot -g copilot .env /opt/copilot/app/.env   # ANTHROPIC_API_KEY, COPILOT_PASSWORD, COPILOT_DAILY_LIMIT
+install -m 600 -o copilot -g copilot .env /opt/copilot/app/.env   # see .env.example: key, password, daily caps
 cd /opt/copilot/app && sudo -u copilot -H /opt/copilot/.local/bin/uv sync --frozen --no-dev
 cp deploy/copilot.service /etc/systemd/system/ && systemctl enable --now copilot
 cp deploy/Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy

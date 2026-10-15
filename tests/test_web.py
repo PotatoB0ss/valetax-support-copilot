@@ -76,6 +76,19 @@ def test_wrong_password_is_rate_limited(server):
     assert login(server, "wrong", ip="8.8.8.8")[0] == 401  # other clients unaffected
 
 
+def test_lockout_also_blocks_the_correct_password(server):
+    """Otherwise brute force just continues with a different status code until the right guess."""
+    for _ in range(web.LOGIN_ATTEMPTS):
+        login(server, "wrong", ip="6.6.6.6")
+    st, cookie = login(server, PASSWORD, ip="6.6.6.6")
+    assert st == 429 and not cookie
+
+
+def test_successful_logins_do_not_count_towards_lockout(server):
+    for _ in range(web.LOGIN_ATTEMPTS + 2):
+        assert login(server, PASSWORD, ip="4.4.4.4")[0] == 303
+
+
 def test_security_headers_present(server):
     _, h, _ = req(server, "GET", "/")
     assert "frame-ancestors 'none'" in h["content-security-policy"]
@@ -131,3 +144,27 @@ def test_unknown_paths_404(server):
     assert req(server, "GET", "/../../etc/passwd")[0] == 404
     assert req(server, "POST", "/api/other")[0] == 404
 
+
+
+def test_daily_usd_cap_blocks_after_spend():
+    b = web.DailyBudget(max_requests=1000, max_usd=0.05)
+    assert b.take() is None
+    b.spend(0.03)
+    assert b.take() is None
+    b.spend(0.03)  # now $0.06 >= $0.05
+    assert "spend limit" in (b.take() or "")
+
+
+def test_daily_request_cap_and_negative_spend_ignored():
+    b = web.DailyBudget(max_requests=2, max_usd=1.0)
+    b.spend(-5)  # never lets a bad value "refund" the budget
+    assert b.take() is None and b.take() is None
+    assert "analysis limit" in (b.take() or "")
+
+
+def test_budget_resets_next_day(monkeypatch):
+    b = web.DailyBudget(max_requests=1, max_usd=1.0)
+    monkeypatch.setattr(web.time, "strftime", lambda *a: "2026-01-01")
+    assert b.take() is None and b.take() is not None
+    monkeypatch.setattr(web.time, "strftime", lambda *a: "2026-01-02")
+    assert b.take() is None

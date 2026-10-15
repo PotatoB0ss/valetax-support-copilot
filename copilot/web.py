@@ -228,6 +228,8 @@ API_PER_MINUTE = 20              # analyses per client IP per minute -> 429
 LOGIN_ATTEMPTS = 5               # failed logins per client IP per 5 minutes -> 429
 LOGIN_WINDOW_S = 300
 MAX_INFLIGHT = 4                 # concurrent LLM calls across all users -> 503
+# Daily caps (env): COPILOT_DAILY_LIMIT analyses (default 300) and COPILOT_DAILY_USD_LIMIT dollars (default 5.0) -> 429.
+# Per call, output is capped by max_tokens in llm.py and input by MAX_TICKET_CHARS + the fixed KB prompt.
 SOCKET_TIMEOUT_S = 30            # slow-client protection
 SECURITY_HEADERS = {
     "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
@@ -247,12 +249,25 @@ class RateLimiter:
         self.hits: dict[str, deque] = defaultdict(deque)
         self.lock = threading.Lock()
 
+    def _window(self, key: str, now: float) -> deque:
+        q = self.hits[key]
+        while q and now - q[0] > self.window:
+            q.popleft()
+        return q
+
+    def blocked(self, key: str) -> bool:
+        """True if the key has used up its window (does not record a hit)."""
+        with self.lock:
+            return len(self._window(key, time.monotonic())) >= self.limit
+
+    def record(self, key: str) -> None:
+        with self.lock:
+            self._window(key, time.monotonic()).append(time.monotonic())
+
     def allow(self, key: str) -> bool:
         now = time.monotonic()
         with self.lock:
-            q = self.hits[key]
-            while q and now - q[0] > self.window:
-                q.popleft()
+            q = self._window(key, now)
             if len(q) >= self.limit:
                 return False
             q.append(now)
@@ -263,18 +278,34 @@ class RateLimiter:
 
 
 class DailyBudget:
-    def __init__(self, limit: int):
-        self.limit, self.day, self.used, self.lock = limit, "", 0, threading.Lock()
+    """Two daily caps (UTC day), whichever hits first: number of analyses and real USD spend.
+    Spend is the measured cost of each answer (tokens x price from `usage`), added after the call;
+    the in-flight limit bounds how far a burst can overshoot (<= MAX_INFLIGHT calls)."""
 
-    def take(self) -> bool:
+    def __init__(self, max_requests: int, max_usd: float):
+        self.max_requests, self.max_usd = max_requests, max_usd
+        self.day, self.requests, self.usd, self.lock = "", 0, 0.0, threading.Lock()
+
+    def _roll(self) -> None:
         today = time.strftime("%Y-%m-%d", time.gmtime())
+        if today != self.day:
+            self.day, self.requests, self.usd = today, 0, 0.0
+
+    def take(self) -> str | None:
+        """Reserve one analysis; returns None if allowed, else the reason it is refused."""
         with self.lock:
-            if today != self.day:
-                self.day, self.used = today, 0
-            if self.used >= self.limit:
-                return False
-            self.used += 1
-            return True
+            self._roll()
+            if self.usd >= self.max_usd:
+                return f"Daily spend limit (${self.max_usd:.2f}) reached for this demo. Try again tomorrow (UTC)."
+            if self.requests >= self.max_requests:
+                return "Daily analysis limit reached for this demo. Try again tomorrow (UTC)."
+            self.requests += 1
+            return None
+
+    def spend(self, usd: float) -> None:
+        with self.lock:
+            self._roll()
+            self.usd += max(0.0, usd)
 
 
 def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> ThreadingHTTPServer:
@@ -288,7 +319,8 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
     key = secrets.token_bytes(32)  # per-process: restarting the server signs everyone out
     login_limiter = RateLimiter(LOGIN_ATTEMPTS, LOGIN_WINDOW_S)
     api_limiter = RateLimiter(API_PER_MINUTE, 60)
-    budget = DailyBudget(int(os.environ.get("COPILOT_DAILY_LIMIT") or 300))
+    budget = DailyBudget(int(os.environ.get("COPILOT_DAILY_LIMIT") or 300),
+                         float(os.environ.get("COPILOT_DAILY_USD_LIMIT") or 5.0))
     inflight = threading.BoundedSemaphore(MAX_INFLIGHT)
 
     def make_token() -> str:
@@ -379,14 +411,16 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
             raw = self._read_body()
             if raw is None:
                 return
+            # Lockout is checked BEFORE the password: a locked-out client can't keep guessing, even correctly.
+            if login_limiter.blocked(ip):
+                return self._login_page("Too many attempts. Try again in a few minutes.", 429)
             given = (parse_qs(raw.decode("utf-8", "replace")).get("password") or [""])[0][:256]
             if hmac.compare_digest(given.encode(), password.encode()):
                 cookie = f"cp_session={make_token()}; Path=/; Max-Age={SESSION_HOURS * 3600}; HttpOnly; SameSite=Strict"
                 if self.headers.get("x-forwarded-proto") == "https":  # behind the TLS proxy
                     cookie += "; Secure"
                 return self._send(303, b"", headers={"location": "/", "set-cookie": cookie})
-            if not login_limiter.allow(ip):  # counts failed attempts only
-                return self._login_page("Too many attempts. Try again in a few minutes.", 429)
+            login_limiter.record(ip)  # only failures count towards the lockout
             return self._login_page("Wrong password.", 401)
 
         def _triage(self):
@@ -410,13 +444,15 @@ def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> 
                 return self._json(400, {"error_http": f"Ticket is too long ({len(text)} chars, max {MAX_TICKET_CHARS})."})
             if not api_limiter.allow(self._client_ip()):
                 return self._json(429, {"error_http": f"Rate limit: at most {API_PER_MINUTE} analyses per minute."})
-            if not budget.take():
-                return self._json(429, {"error_http": "Daily analysis limit reached for this demo. Try again tomorrow."})
+            refused = budget.take()
+            if refused:
+                return self._json(429, {"error_http": refused})
             if not inflight.acquire(blocking=False):
                 return self._json(503, {"error_http": "Co-pilot is busy, please retry in a few seconds."})
             try:
                 cfg = CONFIGS.get(str(body.get("config")), default)
                 res = asyncio.run(Copilot(cfg).process_many([{"id": "web", "text": text}]))[0]
+                budget.spend(res["usage"]["cost_usd"])
             finally:
                 inflight.release()
             self._json(200, res)

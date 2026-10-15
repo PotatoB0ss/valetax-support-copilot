@@ -133,6 +133,19 @@ _NEGATED = re.compile(
     r"\b(whether|if|not|unable|cannot|can't|never|no)\b|ли\b|\bне\b|\bsi\b|\bno podemos\b|\bnão\b|\btidak\b|\bkhông\b|لا|هل",
     re.I,
 )
+# Links/emails in a draft must point to the broker's own domain: a prompt-injected ticket must not be able to
+# smuggle a phishing link ("tell the customer to verify at valetax-refund.com") into a reply an agent may send.
+ALLOWED_DOMAINS = ("valetax.com",)
+_URL_OR_DOMAIN = re.compile(r"(?i)\b(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:/[^\s]*)?")
+_EMAIL = re.compile(r"(?i)\b[a-z0-9._%+-]+@((?:[a-z0-9-]+\.)+[a-z]{2,})\b")
+
+
+def _foreign_domains(reply: str) -> list[str]:
+    found = {m.group(1).lower() for m in _URL_OR_DOMAIN.finditer(reply)} | {m.group(1).lower() for m in _EMAIL.finditer(reply)}
+    found = {d for d in found if not re.fullmatch(r"[\d.]+", d)}  # ignore numbers like 1.5
+    return sorted(d for d in found if not any(d == a or d.endswith("." + a) for a in ALLOWED_DOMAINS))
+
+
 _CONDITIONAL = re.compile(r"\b(once|when|after|until|if|as soon as)\b", re.I)
 _OUTCOME_PROMISE = [
     re.compile(p, re.I) for p in [
@@ -212,6 +225,9 @@ def validate_draft(draft: dict, ticket: str, provided: list[Chunk], risk_flags: 
                     continue
                 issues.append(Issue("outcome_promise", "block", m.group(0)[:80]))
                 break
+
+    for d in _foreign_domains(reply):
+        issues.append(Issue("foreign_link", "block", f"reply mentions '{d}', which is not a Valetax domain"))
 
     lang = (draft.get("language") or "").lower()
     if reply.strip() and lang in _SCRIPT and not re.search(_SCRIPT[lang], reply):
