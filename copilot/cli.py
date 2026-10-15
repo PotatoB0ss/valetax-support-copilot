@@ -15,7 +15,7 @@ import json
 import sys
 from pathlib import Path
 
-from .config import CONFIGS, DEFAULT_CONFIG, load_dotenv
+from .config import CONFIGS, DEFAULT_CONFIG, WEB_DEFAULT_CONFIG, load_dotenv
 from .pipeline import Copilot
 
 
@@ -46,7 +46,7 @@ def render_card(r: dict) -> str:
 def main(argv: list[str] | None = None) -> None:
     load_dotenv()
     ap = argparse.ArgumentParser(prog="copilot", description="Support-ticket co-pilot")
-    ap.add_argument("--config", default=DEFAULT_CONFIG, choices=sorted(CONFIGS))
+    ap.add_argument("--config", default=None, choices=sorted(CONFIGS))
     sub = ap.add_subparsers(dest="cmd", required=True)
     t = sub.add_parser("triage")
     t.add_argument("text", nargs="?", help="ticket text (or stdin)")
@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("kb")
     sub.add_parser("configs")
     a = ap.parse_args(argv)
-    cfg = CONFIGS[a.config]
+    cfg = CONFIGS[a.config or (WEB_DEFAULT_CONFIG if a.cmd == "serve" else DEFAULT_CONFIG)]
 
     if a.cmd == "configs":
         for c in CONFIGS.values():

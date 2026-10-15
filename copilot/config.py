@@ -52,7 +52,8 @@ CONFIGS: dict[str, Config] = {c.name: c for c in [
            description="Offline rules-only baseline (keyword rules + top BM25 chunk). Tests/CI/demo without API key"),
 ]}
 
-DEFAULT_CONFIG = "p1-sonnet"
+DEFAULT_CONFIG = "p1-sonnet"      # CLI / batch: the configuration the business case recommends
+WEB_DEFAULT_CONFIG = "p1-opus"   # web demo: best judged draft quality
 
 
 def load_dotenv(path: Path = ROOT / ".env") -> None:
