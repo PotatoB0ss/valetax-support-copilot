@@ -8,7 +8,9 @@ import hmac
 import json
 import os
 import secrets
+import threading
 import time
+from collections import defaultdict, deque
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
@@ -39,7 +41,7 @@ header{display:flex;align-items:center;gap:12px;padding:14px 24px;border-bottom:
 .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--vio));display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px}
 header h1{font-size:16px;margin:0;font-weight:650;letter-spacing:-.01em}
 header .sub{color:var(--mute);font-size:13px}
-header .out{font-size:13px;color:var(--ink2);text-decoration:none;padding:6px 12px;border:1px solid var(--line);border-radius:8px}
+header .out{font:inherit;font-size:13px;color:var(--ink2);background:none;cursor:pointer;padding:6px 12px;border:1px solid var(--line);border-radius:8px}
 header .out:hover{color:var(--acc);border-color:var(--acc)}
 header .kb{margin-left:auto;font-size:12px;color:var(--mute);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 main{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:20px;padding:20px 24px;max-width:1400px;margin:0 auto}
@@ -105,7 +107,7 @@ footer.meta b{color:var(--ink2);font-weight:600}
 .err{padding:16px 20px;border-left:4px solid var(--bad);color:var(--bad)}
 .fade{animation:f .25s ease-out}@keyframes f{from{transform:translateY(6px)}to{transform:none}}
 </style></head><body>
-<header><div class="logo">C</div><div><h1>Support Co-pilot</h1><div class="sub">Valetax · classify · grounded draft · route</div></div><div class="kb" id="kb"></div><a class="out" href="/logout">Sign out</a></header>
+<header><div class="logo">C</div><div><h1>Support Co-pilot</h1><div class="sub">Valetax · classify · grounded draft · route</div></div><div class="kb" id="kb"></div><form method="post" action="/logout" style="margin:0"><button class="out" type="submit">Sign out</button></form></header>
 <main>
 <section class="panel left">
   <label class="k" for="t">Customer ticket</label>
@@ -219,16 +221,75 @@ button{width:100%;margin-top:16px;font:inherit;font-weight:600;padding:11px;bord
 
 SESSION_HOURS = 12
 
+# ---- abuse controls (every analysis is a paid LLM call; the site is on the public internet) ----
+MAX_BODY_BYTES = 32_000          # request body cap -> 413
+MAX_TICKET_CHARS = 5_000         # a real ticket is far shorter; caps cost per call -> 400
+API_PER_MINUTE = 20              # analyses per client IP per minute -> 429
+LOGIN_ATTEMPTS = 5               # failed logins per client IP per 5 minutes -> 429
+LOGIN_WINDOW_S = 300
+MAX_INFLIGHT = 4                 # concurrent LLM calls across all users -> 503
+SOCKET_TIMEOUT_S = 30            # slow-client protection
+SECURITY_HEADERS = {
+    "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+                               "img-src data:; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer",
+    "cache-control": "no-store",
+}
 
-def serve(default: Config, port: int = 8000) -> None:
+
+class RateLimiter:
+    """Sliding-window counter per key (thread-safe, in-memory: fine for one process behind one proxy)."""
+
+    def __init__(self, limit: int, window_s: float):
+        self.limit, self.window = limit, window_s
+        self.hits: dict[str, deque] = defaultdict(deque)
+        self.lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        with self.lock:
+            q = self.hits[key]
+            while q and now - q[0] > self.window:
+                q.popleft()
+            if len(q) >= self.limit:
+                return False
+            q.append(now)
+            if len(self.hits) > 10_000:  # bound memory under IP spraying
+                for k in [k for k, v in self.hits.items() if not v][:5_000]:
+                    del self.hits[k]
+            return True
+
+
+class DailyBudget:
+    def __init__(self, limit: int):
+        self.limit, self.day, self.used, self.lock = limit, "", 0, threading.Lock()
+
+    def take(self) -> bool:
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        with self.lock:
+            if today != self.day:
+                self.day, self.used = today, 0
+            if self.used >= self.limit:
+                return False
+            self.used += 1
+            return True
+
+
+def build_server(default: Config, port: int = 8000, host: str = "127.0.0.1") -> ThreadingHTTPServer:
     import html
 
     # Minimal shared-password auth (stub for SSO): password from COPILOT_PASSWORD, signed session cookie.
     password = os.environ.get("COPILOT_PASSWORD") or ""
     if not password:
-        password = secrets.token_urlsafe(9)
+        password = secrets.token_urlsafe(12)
         print(f"COPILOT_PASSWORD not set -> generated one for this run: {password}")
     key = secrets.token_bytes(32)  # per-process: restarting the server signs everyone out
+    login_limiter = RateLimiter(LOGIN_ATTEMPTS, LOGIN_WINDOW_S)
+    api_limiter = RateLimiter(API_PER_MINUTE, 60)
+    budget = DailyBudget(int(os.environ.get("COPILOT_DAILY_LIMIT") or 300))
+    inflight = threading.BoundedSemaphore(MAX_INFLIGHT)
 
     def make_token() -> str:
         exp = str(int(time.time()) + SESSION_HOURS * 3600)
@@ -244,51 +305,128 @@ def serve(default: Config, port: int = 8000) -> None:
     page = PAGE.replace("__OPTS__", opts).replace("__CFGS__", descs).encode()
 
     class H(BaseHTTPRequestHandler):
-        def log_message(self, *a):  # keep the console quiet
+        server_version = "copilot"
+        sys_version = ""
+        timeout = SOCKET_TIMEOUT_S
+
+        def log_message(self, *a):  # keep the console quiet (no ticket text in logs)
             pass
 
+        def _client_ip(self) -> str:
+            # The app only listens on localhost behind Caddy, which sets X-Forwarded-For to the real client IP
+            # (and drops client-supplied values). Trust the header only when the peer is the local proxy.
+            peer = self.client_address[0]
+            xff = self.headers.get("x-forwarded-for")
+            if peer in ("127.0.0.1", "::1") and xff:
+                return xff.split(",")[-1].strip()
+            return peer
+
         def _authed(self) -> bool:
-            c = SimpleCookie(self.headers.get("cookie") or "")
+            c = SimpleCookie()
+            try:
+                c.load(self.headers.get("cookie") or "")
+            except Exception:
+                return False
             return "cp_session" in c and valid(c["cp_session"].value)
 
         def _send(self, code: int, body: bytes, ctype: str = "text/html; charset=utf-8", headers: dict | None = None):
             self.send_response(code)
             self.send_header("content-type", ctype)
-            self.send_header("cache-control", "no-store")
-            for k, v in (headers or {}).items():
+            self.send_header("content-length", str(len(body)))
+            for k, v in {**SECURITY_HEADERS, **(headers or {})}.items():
                 self.send_header(k, v)
             self.end_headers()
             self.wfile.write(body)
+
+        def _json(self, code: int, obj: dict):
+            self._send(code, json.dumps(obj, ensure_ascii=False).encode(), "application/json")
 
         def _login_page(self, error: str = "", code: int = 200):
             err = f'<div class="err">{html.escape(error)}</div>' if error else ""
             self._send(code, LOGIN.replace("__ERR__", err).encode())
 
+        def _read_body(self) -> bytes | None:
+            try:
+                n = int(self.headers.get("content-length") or 0)
+            except ValueError:
+                n = -1
+            if n < 0 or n > MAX_BODY_BYTES:
+                self.close_connection = True
+                self._send(413 if n > MAX_BODY_BYTES else 400, b'{"error_http": "Request too large or malformed."}', "application/json")
+                return None
+            return self.rfile.read(n)
+
         def do_GET(self):
-            if self.path.startswith("/logout"):
-                return self._send(303, b"", headers={"location": "/", "set-cookie": "cp_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"})
+            path = self.path.split("?", 1)[0]
+            if path != "/":
+                return self._send(404, b"Not found", "text/plain")
             if not self._authed():
                 return self._login_page()
             self._send(200, page)
 
         def do_POST(self):
-            raw = self.rfile.read(int(self.headers.get("content-length") or 0))
-            if self.path.startswith("/login"):
-                given = (parse_qs(raw.decode("utf-8", "replace")).get("password") or [""])[0]
-                if hmac.compare_digest(given.encode(), password.encode()):
-                    cookie = f"cp_session={make_token()}; Path=/; Max-Age={SESSION_HOURS * 3600}; HttpOnly; SameSite=Strict"
-                    if self.headers.get("x-forwarded-proto") == "https":  # behind the TLS proxy
-                        cookie += "; Secure"
-                    return self._send(303, b"", headers={"location": "/", "set-cookie": cookie})
-                time.sleep(1.0)  # slow down guessing
-                return self._login_page("Wrong password.", 401)
-            if not self._authed():
-                return self._send(401, b'{"auth": false}', "application/json")
-            body = json.loads(raw or b"{}")
-            cfg = CONFIGS.get(body.get("config"), default)
-            text = (body.get("text") or "").strip()
-            res = {"error_http": "empty ticket"} if not text else asyncio.run(Copilot(cfg).process_many([{"id": "web", "text": text}]))[0]
-            self._send(200, json.dumps(res, ensure_ascii=False).encode(), "application/json")
+            path = self.path.split("?", 1)[0]
+            if path == "/logout":
+                return self._send(303, b"", headers={"location": "/", "set-cookie": "cp_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"})
+            if path == "/login":
+                return self._login()
+            if path == "/api/triage":
+                return self._triage()
+            self._send(404, b"Not found", "text/plain")
 
-    print(f"Co-pilot UI on http://127.0.0.1:{port}  (default config {default.name})")
-    ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
+        def _login(self):
+            ip = self._client_ip()
+            raw = self._read_body()
+            if raw is None:
+                return
+            given = (parse_qs(raw.decode("utf-8", "replace")).get("password") or [""])[0][:256]
+            if hmac.compare_digest(given.encode(), password.encode()):
+                cookie = f"cp_session={make_token()}; Path=/; Max-Age={SESSION_HOURS * 3600}; HttpOnly; SameSite=Strict"
+                if self.headers.get("x-forwarded-proto") == "https":  # behind the TLS proxy
+                    cookie += "; Secure"
+                return self._send(303, b"", headers={"location": "/", "set-cookie": cookie})
+            if not login_limiter.allow(ip):  # counts failed attempts only
+                return self._login_page("Too many attempts. Try again in a few minutes.", 429)
+            return self._login_page("Wrong password.", 401)
+
+        def _triage(self):
+            if not self._authed():
+                return self._json(401, {"auth": False})
+            if (self.headers.get("content-type") or "").split(";")[0].strip().lower() != "application/json":
+                return self._json(415, {"error_http": "Expected application/json."})  # blocks cross-site form posts
+            raw = self._read_body()
+            if raw is None:
+                return
+            try:
+                body = json.loads(raw or b"{}")
+                if not isinstance(body, dict):
+                    raise ValueError
+            except ValueError:
+                return self._json(400, {"error_http": "Malformed JSON."})
+            text = str(body.get("text") or "").strip()
+            if not text:
+                return self._json(400, {"error_http": "Empty ticket."})
+            if len(text) > MAX_TICKET_CHARS:
+                return self._json(400, {"error_http": f"Ticket is too long ({len(text)} chars, max {MAX_TICKET_CHARS})."})
+            if not api_limiter.allow(self._client_ip()):
+                return self._json(429, {"error_http": f"Rate limit: at most {API_PER_MINUTE} analyses per minute."})
+            if not budget.take():
+                return self._json(429, {"error_http": "Daily analysis limit reached for this demo. Try again tomorrow."})
+            if not inflight.acquire(blocking=False):
+                return self._json(503, {"error_http": "Co-pilot is busy, please retry in a few seconds."})
+            try:
+                cfg = CONFIGS.get(str(body.get("config")), default)
+                res = asyncio.run(Copilot(cfg).process_many([{"id": "web", "text": text}]))[0]
+            finally:
+                inflight.release()
+            self._json(200, res)
+
+    srv = ThreadingHTTPServer((host, port), H)
+    srv.daemon_threads = True
+    return srv
+
+
+def serve(default: Config, port: int = 8000) -> None:
+    srv = build_server(default, port)
+    print(f"Co-pilot UI on http://127.0.0.1:{srv.server_address[1]}  (default config {default.name})")
+    srv.serve_forever()

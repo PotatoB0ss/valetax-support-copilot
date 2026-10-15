@@ -12,6 +12,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv sync
       - run: uv run pytest -q
+      - run: uvx bandit -q -r copilot evals business_case
+      - run: uv export --no-hashes --format requirements-txt > req.txt && uvx pip-audit -r req.txt
       - run: uv run python -m evals.run_eval --configs mock --limit 83   # offline smoke run, no key needed
 
   release-gate:

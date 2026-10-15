@@ -29,7 +29,7 @@ VERBS = ["deposit", "withdraw", "verify", "open", "transfer", "credit", "approve
 
 
 def synthetic_chunks(n: int, seed: int = 7) -> list[Chunk]:
-    rnd = random.Random(seed)
+    rnd = random.Random(seed)  # nosec B311 - deterministic synthetic data, not security-related
     out = []
     for i in range(n):
         topic, aspect, region = rnd.choice(TOPICS), rnd.choice(ASPECTS), rnd.choice(REGIONS)

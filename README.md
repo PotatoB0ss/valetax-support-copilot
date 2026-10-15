@@ -15,6 +15,7 @@ anything the co-pilot must never decide.
 | [results/SUMMARY.md](results/SUMMARY.md) | Side-by-side metrics for 6 configurations (+ rules-only baseline) |
 | [docs/KB_AUDIT.md](docs/KB_AUDIT.md) | Gaps, duplicates and contradictions in the 4 KB pages, and how the co-pilot handles each |
 | [results/scale_sim.md](results/scale_sim.md) | Phase 2 simulation: retrieval recall and cost as the KB grows to 20k chunks |
+| [SECURITY.md](SECURITY.md) | Threat model: prompt injection, cost abuse, auth, CSRF/XSS, rate limits; scanner results |
 
 ## Brief → where it is done
 
@@ -48,7 +49,7 @@ uv run python -m copilot batch data/eval/tickets.jsonl -o out.jsonl
 uv run python -m copilot serve                   # web UI on http://127.0.0.1:8000 (password login, Opus by default)
 uv run python -m copilot configs                 # list configurations
 
-uv run pytest -q                                 # 32 unit tests, offline
+uv run pytest -q                                 # 43 tests (core + web security), offline
 uv run python -m evals.run_eval --configs mock   # offline eval (rules-only baseline), no key needed
 uv run python -m evals.run_eval --configs p1-sonnet,p1-haiku --judge   # real eval + LLM judge (~$1.5)
 uv run python -m evals.run_eval --configs p1-sonnet --judge --gate     # CI release gate (exit 1 on failure)
